@@ -22,7 +22,6 @@ import (
 )
 
 func main() {
-	SetEnvVariables()
 	err := rootCmd.Execute()
 	if err != nil {
 		panic(err)
