@@ -68,7 +68,7 @@ func CmdHandler(args []string) model.Errors {
 		}
 	}
 
-	dirPath := viper.Get("dirPath").(string)
+	dirPath := "./generated"
 
 	//call this function
 	_, err1 := generators.Generate(appJson, dirPath)

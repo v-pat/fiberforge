@@ -17,7 +17,6 @@ import (
 	"archive/zip"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/spf13/viper"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 )
@@ -239,7 +238,7 @@ func GenerateApplicationCode(appJson model.AppJson, database string, dirPath str
 
 func CreateApplicationZip(appName string) (string, error) {
 	// Directory to zip
-	dirToZip := viper.Get("dirPath").(string)
+	dirToZip := "./generated"
 
 	// Create a temporary zip file
 	zipFile := appName + ".zip"

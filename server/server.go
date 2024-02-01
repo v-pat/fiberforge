@@ -8,7 +8,6 @@ import (
 	"github.com/v-pat/fiberforge/model"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/spf13/viper"
 )
 
 func Serve() {
@@ -27,7 +26,7 @@ func Handler(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid JSON"})
 	}
 
-	dirPath := viper.Get("dirPath").(string)
+	dirPath := "./generated"
 
 	zipFile, errs := generator.Generate(appJson, dirPath)
 

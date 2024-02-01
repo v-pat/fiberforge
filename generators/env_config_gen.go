@@ -1,32 +1,23 @@
 package generators
 
 import (
-	"encoding/json"
 	"os"
 	"text/template"
 
 	"github.com/v-pat/fiberforge/model"
 	tmpl "github.com/v-pat/fiberforge/templates"
-
-	"github.com/spf13/viper"
 )
 
 func CreateConfigJsonFile(appName string) error {
 
 	//Get database config
-	dbDetails := model.DbConfigDetails{}
-
-	data, err := json.Marshal(viper.Get("sql_database"))
-	if err != nil {
-		return err
+	dbDetails := model.DbConfigDetails{
+		Host:     "localhost",
+		Port:     3306,
+		User:     "root",
+		Password: "root",
+		Database: appName,
 	}
-
-	err = json.Unmarshal(data, &dbDetails)
-	if err != nil {
-		return err
-	}
-
-	dbDetails.Database = appName
 
 	// Create a new template
 	tmpl, err := template.New("envConfig").Parse(tmpl.EnvConfigTemplate)
