@@ -39,7 +39,6 @@ Type ```go install github.com/v-pat/fiberforge``` command in terminal.
                   ...
                 "NTH_COLUMN_NAME":<VALUE>,
             },
-            "endpoint":"<ENDPOINT_FOR_THIS_TABLE>"
         },
     ]
   }
