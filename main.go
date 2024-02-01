@@ -18,7 +18,6 @@ import (
 
 	"github.com/briandowns/spinner"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 func main() {
@@ -76,19 +75,6 @@ func CmdHandler(args []string) model.Errors {
 		return err1
 	}
 	return model.NewErr("", fiber.StatusOK)
-}
-
-func SetEnvVariables() {
-	viper.SetConfigFile("config.json")
-	viper.SetConfigType("json")
-	viper.AddConfigPath(".")
-	viper.AutomaticEnv()
-
-	err := viper.ReadInConfig()
-	if err != nil {
-		panic(err)
-	}
-
 }
 
 var rootCmd = &cobra.Command{
