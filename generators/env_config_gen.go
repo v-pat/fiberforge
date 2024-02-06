@@ -1,6 +1,7 @@
 package generators
 
 import (
+	"log"
 	"os"
 	"text/template"
 
@@ -8,16 +9,30 @@ import (
 	tmpl "github.com/v-pat/fiberforge/templates"
 )
 
-func CreateConfigJsonFile(appName string) error {
+func CreateConfigJsonFile(appName string, database string) error {
 
 	//Get database config
-	dbDetails := model.DbConfigDetails{
-		Host:     "localhost",
-		Port:     3306,
-		User:     "root",
-		Password: "root",
-		Database: appName,
+	var dbDetails model.DbConfigDetails
+	if database == "mysql" {
+		dbDetails = model.DbConfigDetails{
+			Host:     "localhost",
+			Port:     3306,
+			User:     "root",
+			Password: "root",
+			Database: appName,
+			DbType:   database,
+		}
+	} else if database == "postgres" {
+		dbDetails = model.DbConfigDetails{
+			Host:     "localhost",
+			Port:     5432,
+			User:     "postgres",
+			Password: "postgres",
+			Database: appName,
+			DbType:   database,
+		}
 	}
+	log.Println(database)
 
 	// Create a new template
 	tmpl, err := template.New("envConfig").Parse(tmpl.EnvConfigTemplate)

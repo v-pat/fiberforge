@@ -6,4 +6,5 @@ type DbConfigDetails struct {
 	Database string `json:"database"`
 	User     string `json:"user"`
 	Password string `json:"password"`
+	DbType   string `json:"db_type"`
 }

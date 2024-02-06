@@ -25,6 +25,17 @@ func Create{{.StructName}}(ctx *fiber.Ctx) error {
 	return ctx.Status(fiber.StatusCreated).JSON(fiber.Map{"message": "{{.StructName}} created."})
 }
 
+// GetAll{{.StructNameTitleCase}}s retrieves all rows in {{.StructName}} table.
+func GetAll{{.StructName}}(ctx *fiber.Ctx) error {
+
+	{{.StructName}}s,err := service.GetAll{{.StructNameTitleCase}}s()
+	if err != nil {
+		return ctx.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to create {{.StructName}}"})
+	}
+
+	return ctx.Status(fiber.StatusOK).JSON({{.StructName}}s)
+}
+
 // Get{{.StructName}}ByID retrieves a {{.StructName}} by ID.
 func Get{{.StructName}}ByID(ctx *fiber.Ctx) error {
 	id := ctx.Params("id")

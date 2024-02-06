@@ -84,20 +84,20 @@ func ConnectToDatabase() (*sql.DB, error) {
 // 	// Create the database
 // 	err := createDatabase()
 // 	if err != nil {
-// 		fmt.Println("Failed to create the database:", err)
+// 		log.Println("Failed to create the database:", err)
 // 		return
 // 	}
-// 	fmt.Println("Database created successfully.")
+// 	log.Println("Database created successfully.")
 
 // 	// Create and connect to the database
 // 	db, err := connectToDatabase()
 // 	if err != nil {
-// 		fmt.Println("Failed to connect to the database:", err)
+// 		log.Println("Failed to connect to the database:", err)
 // 		return
 // 	}
 // 	defer db.Close()
 
-// 	fmt.Println("Connected to the database successfully")
+// 	log.Println("Connected to the database successfully")
 
 // 	// Now, you can use 'db' to perform database operations
 // }

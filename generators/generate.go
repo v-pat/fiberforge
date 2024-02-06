@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -23,10 +24,11 @@ import (
 
 func Generate(appJson model.AppJson, dirPath string) (string, model.Errors) {
 
+	log.Println(appJson.Database)
 	err := GenerateApplicationCode(appJson, appJson.Database, dirPath)
 
 	if err != nil {
-		fmt.Println("Unable to generate application code : " + err.Error())
+		log.Println("Unable to generate application code : " + err.Error())
 		return "", model.NewErr("Unable to generate application code : "+err.Error(), fiber.StatusInternalServerError)
 	}
 
@@ -35,13 +37,13 @@ func Generate(appJson model.AppJson, dirPath string) (string, model.Errors) {
 	zipFile, err := CreateApplicationZip(appJson.AppName)
 
 	if err != nil {
-		fmt.Println("Unable to zip application code  : " + err.Error())
+		log.Println("Unable to zip application code  : " + err.Error())
 		return "", model.NewErr("Unable to zip application code  : "+err.Error(), fiber.StatusInternalServerError)
 	}
 
 	err = os.RemoveAll(dirPath)
 	if err != nil {
-		fmt.Println("Unable to clean generated directory  : " + err.Error())
+		log.Println("Unable to clean generated directory  : " + err.Error())
 		return "", model.NewErr("Unable to clean generated directory  : "+err.Error(), fiber.StatusInternalServerError)
 	}
 
@@ -67,7 +69,7 @@ func createFiles(name string, dirPath string) {
 
 	err = initCommand.Run()
 	if err != nil {
-		fmt.Println("Err :" + err.Error())
+		log.Println("Err :" + err.Error())
 		panic("Go mod init failed")
 	}
 
@@ -125,7 +127,7 @@ func updateModFile() error {
 
 	err := importCommand.Run()
 	if err != nil {
-		fmt.Println("Goimports failed:" + err.Error())
+		log.Println("Goimports failed:" + err.Error())
 		return err
 	}
 
@@ -138,7 +140,7 @@ func updateModFile() error {
 
 	err = getCommand.Run()
 	if err != nil {
-		fmt.Println("go get failed:" + err.Error())
+		log.Println("go get failed:" + err.Error())
 		return err
 	}
 
@@ -179,7 +181,7 @@ func GenerateApplicationCode(appJson model.AppJson, database string, dirPath str
 
 	// Parse the "database" query parameter
 	if database != "postgres" && database != "mysql" {
-		fmt.Println("Unabel to process request : Invalid database type")
+		log.Println("Unabel to process request : Invalid database type")
 		return errors.New("Only supported databases are mysql and postgres.")
 	}
 
@@ -187,9 +189,9 @@ func GenerateApplicationCode(appJson model.AppJson, database string, dirPath str
 
 	generationstatus.UpdateGenerationStatus(utils.ENVCONFIG_GEN_START)
 
-	err := CreateConfigJsonFile(appJson.AppName)
+	err := CreateConfigJsonFile(appJson.AppName, database)
 	if err != nil {
-		fmt.Println("Unabel to generate config.json : " + err.Error())
+		log.Println("Unabel to generate config.json : " + err.Error())
 		return err
 	}
 
@@ -205,7 +207,7 @@ func GenerateApplicationCode(appJson model.AppJson, database string, dirPath str
 	//creates model,controlles and service files
 	_, err = CreateServices(structDefs, database, appJson.AppName)
 	if err != nil {
-		fmt.Println("Unabel to generate services : " + err.Error())
+		log.Println("Unabel to generate services : " + err.Error())
 		return err
 	}
 
@@ -214,7 +216,7 @@ func GenerateApplicationCode(appJson model.AppJson, database string, dirPath str
 	// Update routes.go to define API endpoints
 	err = UpdateRoutesFile(structDefs, database, appJson.AppName)
 	if err != nil {
-		fmt.Println("Unabel to generate routes : " + err.Error())
+		log.Println("Unabel to generate routes : " + err.Error())
 		return err
 	}
 
@@ -222,7 +224,7 @@ func GenerateApplicationCode(appJson model.AppJson, database string, dirPath str
 
 	err = CreateMainFile(structDefs, database, appJson.AppName)
 	if err != nil {
-		fmt.Println("Unabel to generate main.go : " + err.Error())
+		log.Println("Unabel to generate main.go : " + err.Error())
 		return err
 	}
 
@@ -287,4 +289,76 @@ func CreateApplicationZip(appName string) (string, error) {
 	}
 
 	return zipFile, nil
+}
+
+func GenerateAndBuild(appJson model.AppJson, dirPath string) (string, model.Errors) {
+
+	generationstatus.UpdateGenerationStatus(utils.CODEGEN_START_MSG)
+
+	err := GenerateApplicationCode(appJson, appJson.Database, dirPath)
+
+	if err != nil {
+		log.Println("Unable to generate application code : " + err.Error())
+		return "", model.NewErr("Unable to generate application code : "+err.Error(), fiber.StatusInternalServerError)
+	}
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	buildCommand := exec.Command("go", "build")
+
+	buildCommand.Dir = dirPath + "/"
+	buildCommand.Stdin = os.Stdin
+	buildCommand.Stdout = &stdout
+	buildCommand.Stderr = &stderr
+
+	err = buildCommand.Run()
+	if err != nil {
+		log.Println("Go build generated file failed:" + err.Error())
+		return "", model.NewErr("Go build generated file failed:"+err.Error(), fiber.StatusInternalServerError)
+	}
+
+	err = MoveFile(dirPath+"/"+appJson.AppName+".exe", appJson.AppName+".exe")
+	if err != nil {
+		log.Println("Moving exe file failed:" + err.Error())
+		return "", model.NewErr("Moving exe file failed:"+err.Error(), fiber.StatusInternalServerError)
+	}
+
+	err = os.RemoveAll(dirPath)
+	if err != nil {
+		log.Println("Unable to clean generated directory  : " + err.Error())
+		return "", model.NewErr("Unable to clean generated directory  : "+err.Error(), fiber.StatusInternalServerError)
+	}
+
+	return appJson.AppName + ".exe", model.NewErr("", fiber.StatusOK)
+}
+
+func MoveFile(sourcePath, destPath string) error {
+	inputFile, err := os.Open(sourcePath)
+	if err != nil {
+		log.Println("Couldn't open source file: %s", err)
+		return err
+	}
+	outputFile, err := os.Create(destPath)
+	if err != nil {
+		inputFile.Close()
+		log.Println("Couldn't open dest file: %s", err)
+		return err
+
+	}
+	defer outputFile.Close()
+	_, err = io.Copy(outputFile, inputFile)
+	inputFile.Close()
+	if err != nil {
+		log.Println("Writing to output file failed: %s", err)
+		return err
+
+	}
+	// The copy was successful, so now delete the original file
+	err = os.Remove(sourcePath)
+	if err != nil {
+		log.Println("Failed removing original file: %s", err)
+		return err
+	}
+	return nil
 }

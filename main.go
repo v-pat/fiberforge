@@ -2,7 +2,7 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
+	"log"
 	"time"
 
 	"os"
@@ -21,13 +21,13 @@ import (
 )
 
 func main() {
-	err := rootCmd.Execute()
+	err := generateCmd.Execute()
 	if err != nil {
 		panic(err)
 	}
 }
 
-func CmdHandler(args []string) model.Errors {
+func CmdHandler(args []string, isBuildRequired bool) model.Errors {
 
 	// Get the file name from the command-line arguments
 	fileName := args[1]
@@ -35,14 +35,14 @@ func CmdHandler(args []string) model.Errors {
 	// Check the file extension
 	fileExt := strings.ToLower(strings.TrimPrefix(filepath.Ext(fileName), "."))
 	if fileExt != "json" && fileExt != "txt" {
-		fmt.Println("Error: Unsupported file type. Only JSON or TXT files are supported.")
+		log.Println("Error: Unsupported file type. Only JSON or TXT files are supported.")
 		return model.NewErr("Error: Unsupported file type. Only JSON or TXT files are supported.", fiber.StatusBadRequest)
 	}
 
 	// Read the content of the file
 	data, err := os.ReadFile(fileName)
 	if err != nil {
-		fmt.Println("Error reading file:", err)
+		log.Println("Error reading file:", err)
 		return model.NewErr("Error reading file:"+err.Error(), fiber.StatusBadRequest)
 	}
 
@@ -54,14 +54,14 @@ func CmdHandler(args []string) model.Errors {
 	case "json":
 		err = json.Unmarshal(data, &appJson)
 		if err != nil {
-			fmt.Println("Error parsing JSON:", err)
+			log.Println("Error parsing JSON:", err)
 			return model.NewErr("Error parsing JSON: "+err.Error(), fiber.StatusBadRequest)
 		}
 	case "txt":
 		// Assuming the TXT file contains JSON data
 		err = json.Unmarshal(data, &appJson)
 		if err != nil {
-			fmt.Println("Error parsing JSON from TXT:", err)
+			log.Println("Error parsing JSON from TXT:", err)
 			return model.NewErr("Error parsing JSON from TXT: "+err.Error(), fiber.StatusBadRequest)
 		}
 	}
@@ -69,36 +69,55 @@ func CmdHandler(args []string) model.Errors {
 	dirPath := "./generated"
 
 	//call this function
-	_, err1 := generators.Generate(appJson, dirPath)
-	if err1.ErrCode != 200 {
-		fmt.Println(err1.Message)
-		return err1
+	if isBuildRequired {
+		_, err1 := generators.GenerateAndBuild(appJson, dirPath)
+		if err != nil {
+			log.Println(err1.Message)
+			return err1
+		}
+	} else {
+
+		_, err1 := generators.Generate(appJson, dirPath)
+		if err1.ErrCode != 200 {
+			log.Println(err1.Message)
+			return err1
+		}
 	}
 	return model.NewErr("", fiber.StatusOK)
 }
 
-var rootCmd = &cobra.Command{
-	Use:   "generate",
+var generateCmd = &cobra.Command{
+	Use:   "generate <file> [build]",
 	Short: "generate - a CLI to generate a simple go fiber project",
 	Long:  "generate - takes configuration from a json or text file and generate code accordingly",
 	Run: func(cmd *cobra.Command, args []string) {
-		Execute(args)
+		Execute(args, cmd)
 	},
 }
 
-func Execute(args []string) {
+func Execute(args []string, cmd *cobra.Command) {
+	log.Println(args)
 	if len(args) == 0 {
 		server.Serve()
 	} else if len(args) == 2 && args[0] == "generate" {
 		s := spinner.New(spinner.CharSets[9], 100*time.Millisecond)
 		generationstatus.Spinner = s
 		s.Start()
-		err := CmdHandler(args)
+		err := CmdHandler(args, false)
 		s.Stop()
 		if err.ErrCode != 200 {
-			fmt.Println(err.Message)
+			log.Println(err.Message)
+		}
+	} else if len(args) == 3 && args[0] == "generate" && args[2] == "build" {
+		s := spinner.New(spinner.CharSets[9], 100*time.Millisecond)
+		generationstatus.Spinner = s
+		s.Start()
+		err := CmdHandler(args, true)
+		s.Stop()
+		if err.ErrCode != 200 {
+			log.Println(err.Message)
 		}
 	} else {
-		fmt.Println("Allowed command is : generate <config_file>")
+		log.Println("Allowed command is : generate <config_file>")
 	}
 }
