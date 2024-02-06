@@ -1,15 +1,21 @@
 package generationstatus
 
 import (
-	"time"
+	"fmt"
 
 	"github.com/briandowns/spinner"
 )
 
 var Spinner *spinner.Spinner
+var LastMessage string = ""
 
 func UpdateGenerationStatus(message string) {
-	Spinner = spinner.New(spinner.CharSets[9], 100*time.Millisecond)
-	Spinner.Suffix = message
+	if LastMessage != "" {
+		Spinner.Disable()
+		fmt.Println("\x1b[32m[✔]\x1b[0m " + LastMessage)
+		Spinner.Enable()
+	}
+	Spinner.Suffix = " " + message
 	Spinner.Restart()
+	LastMessage = message
 }

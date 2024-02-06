@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"time"
 
@@ -12,7 +13,6 @@ import (
 	generationstatus "github.com/v-pat/fiberforge/generation_status"
 	"github.com/v-pat/fiberforge/generators"
 	"github.com/v-pat/fiberforge/model"
-	"github.com/v-pat/fiberforge/server"
 
 	"github.com/gofiber/fiber/v2"
 
@@ -87,7 +87,7 @@ func CmdHandler(args []string, isBuildRequired bool) model.Errors {
 }
 
 var generateCmd = &cobra.Command{
-	Use:   "generate <file> [build]",
+	Use:   "generate <file>",
 	Short: "generate - a CLI to generate a simple go fiber project",
 	Long:  "generate - takes configuration from a json or text file and generate code accordingly",
 	Run: func(cmd *cobra.Command, args []string) {
@@ -96,14 +96,17 @@ var generateCmd = &cobra.Command{
 }
 
 func Execute(args []string, cmd *cobra.Command) {
-	log.Println(args)
-	if len(args) == 0 {
-		server.Serve()
-	} else if len(args) == 2 && args[0] == "generate" {
+	//Uncoment the lines below to use as server
+	// if len(args) == 0 {
+	// 	server.Serve()
+	// } else
+	if len(args) == 2 && args[0] == "generate" {
 		s := spinner.New(spinner.CharSets[9], 100*time.Millisecond)
 		generationstatus.Spinner = s
-		s.Start()
+		go s.Start()
 		err := CmdHandler(args, false)
+		// s.HideCursor = true
+		s.FinalMSG = fmt.Sprintf("\x1b[32m[✔]\x1b[0m " + "\x1b[34mCode generated successfully. Please check newly created zip file in this directory.\x1b[0m")
 		s.Stop()
 		if err.ErrCode != 200 {
 			log.Println(err.Message)
