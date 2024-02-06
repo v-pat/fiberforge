@@ -39,11 +39,15 @@ func GetAll{{.StructName}}(ctx *fiber.Ctx) error {
 // Get{{.StructName}}ByID retrieves a {{.StructName}} by ID.
 func Get{{.StructName}}ByID(ctx *fiber.Ctx) error {
 	id := ctx.Params("id")
+
+	{{if ne .DbType "mongodb"}}
 	intId,err := strconv.Atoi(id)
+	
 	if err != nil {
 		return ctx.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Id not valid"})
 	}
-	{{.StructName}}, err := service.Get{{.StructName}}ByID(intId)
+	{{end}}
+	{{.StructName}}, err := service.Get{{.StructName}}ByID({{if ne .DbType "mongodb"}}intId{{else}}id{{end}})
 	if err != nil {
 		return ctx.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "{{.StructName}} not found"})
 	}
@@ -54,6 +58,7 @@ func Get{{.StructName}}ByID(ctx *fiber.Ctx) error {
 // Update{{.StructName}} updates an existing {{.StructName}} by ID.
 func Update{{.StructName}}(ctx *fiber.Ctx) error {
 	id := ctx.Params("id")
+
 	var updated{{.StructName}} model.{{.StructNameTitleCase}}
 	if err := ctx.BodyParser(&updated{{.StructName}}); err != nil {
 		return ctx.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid request"})
@@ -70,12 +75,14 @@ func Update{{.StructName}}(ctx *fiber.Ctx) error {
 // Delete{{.StructName}}ByID deletes a {{.StructName}} by ID.
 func Delete{{.StructName}}ByID(ctx *fiber.Ctx) error {
 	id := ctx.Params("id")
+	{{if ne .DbType "mongodb"}}
 	intId,err := strconv.Atoi(id)
 	if err != nil {
 		return ctx.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Id not valid"})
 	}
-	err = service.Delete{{.StructName}}ByID(intId)
-	if err != nil {
+	{{end}}
+	err1 := service.Delete{{.StructName}}ByID({{if ne .DbType "mongodb"}}intId{{else}}id{{end}})
+	if err1 != nil {
 		return ctx.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to delete {{.StructName}}"})
 	}
 

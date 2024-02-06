@@ -33,6 +33,7 @@ func GenerateServiceFile(fileName string, structDef model.StructDefinition, stru
 		Database            string
 		DBName              string
 		StructCode          string
+		DbType              string
 	}{
 		AppName:             appName,
 		StructName:          structDef.StructName,
@@ -40,6 +41,7 @@ func GenerateServiceFile(fileName string, structDef model.StructDefinition, stru
 		Database:            database,
 		StructCode:          structCode,
 		DBName:              cases.Title(language.English).String(appName),
+		DbType:              database,
 	}
 
 	// Execute the template and write to the service file
