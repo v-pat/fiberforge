@@ -4,7 +4,7 @@ package utils
 var CODEGEN_START_MSG = "Code generation has started."
 var DB_GEN_START = "Generating database connection code..."
 var CONTROLLER_GEN_START = "Generating controllers..."
-var SERVICE_GEN_START = "Generating services..."
+var SERVICE_GEN_START = "Generating models, controllers and services..."
 var ROUTES_GEN_START = "Generating routes..."
 var ENVCONFIG_GEN_START = "Generating env config file..."
 var MODEL_GEN_START = "Generating models..."
