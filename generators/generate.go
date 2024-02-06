@@ -24,7 +24,6 @@ import (
 
 func Generate(appJson model.AppJson, dirPath string) (string, model.Errors) {
 
-	log.Println(appJson.Database)
 	err := GenerateApplicationCode(appJson, appJson.Database, dirPath)
 
 	if err != nil {
@@ -46,6 +45,8 @@ func Generate(appJson model.AppJson, dirPath string) (string, model.Errors) {
 		log.Println("Unable to clean generated directory  : " + err.Error())
 		return "", model.NewErr("Unable to clean generated directory  : "+err.Error(), fiber.StatusInternalServerError)
 	}
+
+	generationstatus.UpdateGenerationStatus(utils.CODE_GENERATED)
 
 	return zipFile, model.NewErr("Code Generated Successfull.", fiber.StatusOK)
 }
