@@ -1,6 +1,6 @@
 # FiberForge
 
-FiberForge is a template-based code generator for creating simple Go Fiber backend applications configured for MySQL or Postgres.
+FiberForge is a template-based code generator for creating simple Go Fiber backend applications configured for MySQL, Postgres or MongoDb.
 
 ## Table of Contents
 
@@ -20,10 +20,11 @@ FiberForge is a template-based code generator for creating simple Go Fiber backe
 - Go (at least Go 1.16)
 - MySQL
 - Postgres
+- MongoDB
 
 ### Installation Steps
 
-Type ```go install github.com/v-pat/fiberforge``` command in terminal.
+Type ```go install github.com/v-pat/fiberforge@latest``` command in terminal.
 
 ## Usage
 
