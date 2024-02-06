@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"log"
 	"time"
 
@@ -13,6 +12,7 @@ import (
 	generationstatus "github.com/v-pat/fiberforge/generation_status"
 	"github.com/v-pat/fiberforge/generators"
 	"github.com/v-pat/fiberforge/model"
+	"golang.org/x/sys/windows"
 
 	"github.com/gofiber/fiber/v2"
 
@@ -96,6 +96,16 @@ var generateCmd = &cobra.Command{
 }
 
 func Execute(args []string, cmd *cobra.Command) {
+
+	// Get the handle to the standard output console
+	handle := windows.Handle(windows.Stdout)
+
+	// Set console mode to enable virtual terminal processing
+	var mode uint32
+	windows.GetConsoleMode(handle, &mode)
+	mode |= windows.ENABLE_VIRTUAL_TERMINAL_PROCESSING
+	windows.SetConsoleMode(handle, mode)
+
 	//Uncoment the lines below to use as server
 	// if len(args) == 0 {
 	// 	server.Serve()
@@ -105,8 +115,6 @@ func Execute(args []string, cmd *cobra.Command) {
 		generationstatus.Spinner = s
 		go s.Start()
 		err := CmdHandler(args, false)
-		// s.HideCursor = true
-		s.FinalMSG = fmt.Sprintf("\x1b[32m[✔]\x1b[0m " + "\x1b[34mCode generated successfully. Please check newly created zip file in this directory.\x1b[0m")
 		s.Stop()
 		if err.ErrCode != 200 {
 			log.Println(err.Message)
