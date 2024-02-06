@@ -29,7 +29,15 @@ type DatabaseConnectionParams struct {
 // GenerateDatabaseConnectionCode generates code for connecting to a database (PostgreSQL or MySQL) and writes it to a file.
 func generateDatabaseConnectionCode(params DatabaseConnectionParams, fileName string) error {
 	// Create a new template
-	tmpl, err := template.New("databaseConnection").Parse(tmpl.DatabaseConnectionTemplate)
+
+	var templ string
+	if params.DatabaseDriverName == "mysql" || params.DatabaseDriverName == "postgres" {
+		templ = tmpl.SqlDbConnectionTemplate
+	} else if params.DatabaseDriverName == "mongodb" {
+		templ = tmpl.MongoDbConnectionTemplate
+	}
+
+	tmpl, err := template.New("databaseConnection").Parse(templ)
 	if err != nil {
 		return err
 	}
@@ -92,6 +100,23 @@ func CreateDatabase(database string, dbName string, structDefs []model.StructDef
 			return err
 		}
 
+	} else if database == "mongodb" {
+		// Example usage: Generate code for MySQL database connection and write to a file
+		// params.DatabaseDriver = "github.com/go-sql-driver/mysql"
+		params.DBPort = "27017"
+		params.DatabaseDriverName = "mongodb"
+		params.DBUser = "root"
+		params.DBPassword = "root"
+		params.DBURLFormat = "%s:%s@%s:%s/%s"
+		params.DBName = dbName
+		params.StructNames = structDefs
+		params.AppName = appName
+
+		err := generateDatabaseConnectionCode(params, "mongo_connection.go")
+		if err != nil {
+			log.Println("Error:", err)
+			return err
+		}
 	}
 	return nil
 }

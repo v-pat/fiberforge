@@ -150,7 +150,7 @@ func updateModFile() error {
 func CreateServices(structDefs []model.StructDefinition, database string, appName string) (fiber.Map, error) {
 	for _, structDef := range structDefs {
 		// Generate Go struct definition
-		structCode, err := GenerateStructFromJSON(structDef.JSONExample, structDef.StructName)
+		structCode, err := GenerateStructFromJSON(structDef.JSONExample, structDef.StructName, strings.ToLower(database))
 		if err != nil {
 			return fiber.Map{"error": "Failed to generate struct"}, err
 		}
@@ -164,7 +164,7 @@ func CreateServices(structDefs []model.StructDefinition, database string, appNam
 
 		// Generate controller methods and save in controller package
 		controllerFileName := fmt.Sprintf("generated/controller/%s_controller.go", strings.ToLower(structDef.StructName))
-		if err := GenerateControllerFile(controllerFileName, structDef, appName); err != nil {
+		if err := GenerateControllerFile(controllerFileName, structDef, appName, strings.ToLower(database)); err != nil {
 			return fiber.Map{"error": "Failed to generate controller file"}, err
 		}
 
@@ -180,9 +180,9 @@ func GenerateApplicationCode(appJson model.AppJson, database string, dirPath str
 	structDefs = appJson.Tables
 
 	// Parse the "database" query parameter
-	if database != "postgres" && database != "mysql" {
+	if database != "postgres" && database != "mysql" && database != "mongodb" {
 		log.Println("Unabel to process request : Invalid database type")
-		return errors.New("Only supported databases are mysql and postgres.")
+		return errors.New("Only supported databases are mysql, postgres and Mongodb.")
 	}
 
 	createFiles(appJson.AppName, dirPath)
@@ -233,6 +233,7 @@ func GenerateApplicationCode(appJson model.AppJson, database string, dirPath str
 	err = updateModFile()
 
 	if err != nil {
+		log.Println(err.Error())
 		panic(err)
 	}
 	return nil

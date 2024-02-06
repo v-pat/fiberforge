@@ -1,6 +1,6 @@
 package templates
 
-const DatabaseConnectionTemplate = `
+const SqlDbConnectionTemplate = `
 package databases
 
 import (
@@ -45,6 +45,26 @@ func ConnectToDb() {
 	)
 
 }
+
+
+`
+
+const MongoDbConnectionTemplate = `
+
+package databases
+
+
+ func ConnectToDb(){
+	database := viper.Get("Database").(string)
+	dbname := viper.Get("DatabaseName").(string)
+	err := mgm.SetDefaultConfig(nil,dbname , options.Client().ApplyURI(database))
+
+	if err!= nil{
+		panic(err)
+	}
+ }
+
+
 
 
 `

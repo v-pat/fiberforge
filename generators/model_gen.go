@@ -15,6 +15,7 @@ import (
 type modelType struct {
 	StructName string
 	Fields     []field
+	DbType     string
 }
 
 // Field represents the structure of a field in a Go struct.
@@ -45,7 +46,7 @@ func inferGoType(value interface{}) string {
 	return "interface{}"
 }
 
-func GenerateStructFromJSON(jsonData map[string]interface{}, structName string) (string, error) {
+func GenerateStructFromJSON(jsonData map[string]interface{}, structName string, database string) (string, error) {
 	// Initialize the struct code
 	structCode := fmt.Sprintf("type %s struct {\n", structName)
 
@@ -66,6 +67,8 @@ func GenerateStructFromJSON(jsonData map[string]interface{}, structName string) 
 			structCode += structField
 		}
 	}
+
+	structVar.DbType = database
 
 	// Define the file path for the model file
 	filePath := fmt.Sprintf("generated/model/%s.go", strings.ToLower(structName))

@@ -11,7 +11,7 @@ import (
 	"golang.org/x/text/language"
 )
 
-func GenerateControllerFile(fileName string, structDef model.StructDefinition, appName string) error {
+func GenerateControllerFile(fileName string, structDef model.StructDefinition, appName string, database string) error {
 	controllerFile, err := os.Create(fileName)
 	if err != nil {
 		return err
@@ -29,10 +29,12 @@ func GenerateControllerFile(fileName string, structDef model.StructDefinition, a
 		StructName          string
 		AppName             string
 		StructNameTitleCase string
+		DbType              string
 	}{
 		StructName:          structDef.StructName,
 		AppName:             appName,
 		StructNameTitleCase: cases.Title(language.English).String(structDef.StructName),
+		DbType:              database,
 	}
 
 	// Execute the template and write to the controller file

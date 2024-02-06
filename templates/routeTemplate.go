@@ -21,7 +21,7 @@ func Routes(app *fiber.App) {
     {{.StructName}}_group.Get("/:id", controller.Get{{.StructName}}ByID)
 
     // GetAll data of {{.StructName}}
-    {{.StructName}}_group.Get("/all", controller.GetAll{{.StructName}})
+    {{.StructName}}_group.Get("/", controller.GetAll{{.StructName}})
 
     // Update a {{.StructName}} by ID
     {{.StructName}}_group.Put("/:id", controller.Update{{.StructName}})
