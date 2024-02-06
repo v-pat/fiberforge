@@ -19,6 +19,19 @@ func  Create{{.StructName}}({{.StructName}} model.{{.StructNameTitlecase}}) erro
     return nil
 }
 
+// GetAll{{.StructNameTitlecase}}s retrieves all rows in {{.StructName}} table.
+func GetAll{{.StructNameTitlecase}}s() ([]model.{{.StructNameTitlecase}},error) {
+	var {{.StructName}}s []model.{{.StructNameTitlecase}}
+
+    result := databases.Database.Find(&{{.StructName}}s)
+
+    if result.RowsAffected == 0 || result.Error != nil {
+        return {{.StructName}}s,errors.New("{{.StructName}} table not found.")
+    }
+
+	return {{.StructName}}s,nil
+}
+
 // Get{{.StructName}} retrieves a {{.StructName}} record from the database by ID.
 func Get{{.StructName}}ByID(id int) (model.{{.StructNameTitlecase}}, error) {
 

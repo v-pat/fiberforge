@@ -1,7 +1,7 @@
 package generators
 
 import (
-	"fmt"
+	"log"
 	"os"
 	"text/template"
 
@@ -71,7 +71,7 @@ func CreateDatabase(database string, dbName string, structDefs []model.StructDef
 		// Example usage: Generate code for PostgreSQL database connection and write to a file
 		err := generateDatabaseConnectionCode(params, "postgres_connection.go")
 		if err != nil {
-			fmt.Println("Error:", err)
+			log.Println("Error:", err)
 			return err
 		}
 	} else if database == "mysql" {
@@ -88,7 +88,7 @@ func CreateDatabase(database string, dbName string, structDefs []model.StructDef
 
 		err := generateDatabaseConnectionCode(params, "mysql_connection.go")
 		if err != nil {
-			fmt.Println("Error:", err)
+			log.Println("Error:", err)
 			return err
 		}
 
