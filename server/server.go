@@ -1,7 +1,7 @@
 package server
 
 import (
-	"fmt"
+	"log"
 	"os"
 
 	generator "github.com/v-pat/fiberforge/generators"
@@ -31,7 +31,7 @@ func Handler(c *fiber.Ctx) error {
 	zipFile, errs := generator.Generate(appJson, dirPath)
 
 	if errs.ErrCode != fiber.StatusOK {
-		fmt.Println(errs.Message)
+		log.Println(errs.Message)
 		return c.Status(errs.ErrCode).SendString(errs.Message)
 	}
 
@@ -41,7 +41,7 @@ func Handler(c *fiber.Ctx) error {
 
 	file, err := os.ReadFile(zipFile)
 	if err != nil {
-		fmt.Println("Unable to read generated zip file  : " + err.Error())
+		log.Println("Unable to read generated zip file  : " + err.Error())
 		return c.Status(fiber.StatusInternalServerError).SendString("Unable to read generated zip file  : " + err.Error())
 	}
 
@@ -50,7 +50,7 @@ func Handler(c *fiber.Ctx) error {
 
 	err = os.Remove(zipFile)
 	if err != nil {
-		fmt.Println("Unable to delete generated zip file  : " + err.Error())
+		log.Println("Unable to delete generated zip file  : " + err.Error())
 	}
 
 	return c.SendStatus(fiber.StatusOK)
