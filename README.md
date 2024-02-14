@@ -12,7 +12,7 @@ FiberForge is a template-based code generator for creating simple Go Fiber backe
 
 ## Features
 
-- Quickly generate and download a Go Fiber backend application with MySQL integration.
+- Quickly generate a Go Fiber backend application with MySQL,Postgres or Mongodb integration.
 - Customizable template structure to fit your project needs.
 - Generates boilerplate code for models, routes, middleware, and database configurations.
 
