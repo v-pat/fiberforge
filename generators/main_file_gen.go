@@ -9,7 +9,7 @@ import (
 )
 
 func CreateMainFile(structDefs []model.StructDefinition, database string, appName string) error {
-	mainFilePath := "generated/main.go"
+	mainFilePath := appName + "/main.go"
 
 	// Open the main.go file for appending
 	mainFile, err := os.OpenFile(mainFilePath, os.O_APPEND|os.O_WRONLY, os.ModeAppend)

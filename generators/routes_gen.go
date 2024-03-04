@@ -12,7 +12,7 @@ import (
 )
 
 func UpdateRoutesFile(structDefs []model.StructDefinition, database string, appName string) error {
-	routesFilePath := "generated/routes/routes.go"
+	routesFilePath := AppName + "/routes/routes.go"
 
 	// Open the routes.go file for appending
 	routesFile, err := os.OpenFile(routesFilePath, os.O_APPEND|os.O_WRONLY, os.ModeAppend)

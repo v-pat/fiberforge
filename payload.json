@@ -1,0 +1,22 @@
+{
+    "appName":"vpat",
+    "database":"mongodb",
+    "tables":[
+        {
+            "name":"tab1",
+            "columns":{
+                "id":1,
+                "name":"vaibhav",
+                "role":"SDE"
+            }
+        },
+        {
+            "name":"tab2",
+            "columns":{
+                "number":245,
+                "surname":"pathak",
+                "job":"SDE"
+            }
+        }
+    ]
+}

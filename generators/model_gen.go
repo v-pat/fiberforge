@@ -71,7 +71,7 @@ func GenerateStructFromJSON(jsonData map[string]interface{}, structName string, 
 	structVar.DbType = database
 
 	// Define the file path for the model file
-	filePath := fmt.Sprintf("generated/model/%s.go", strings.ToLower(structName))
+	filePath := fmt.Sprintf(AppName+"/model/%s.go", strings.ToLower(structName))
 
 	// Create the model file
 	modelFile, err := os.Create(filePath)

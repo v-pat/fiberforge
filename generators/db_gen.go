@@ -43,7 +43,7 @@ func generateDatabaseConnectionCode(params DatabaseConnectionParams, fileName st
 	}
 
 	// Create or open the file
-	file, err := os.Create("generated/databases/" + fileName)
+	file, err := os.Create(AppName + "/databases/" + fileName)
 	if err != nil {
 		return err
 	}
