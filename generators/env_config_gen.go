@@ -49,7 +49,7 @@ func CreateConfigJsonFile(appName string, database string) error {
 	}
 
 	// Create or open the file
-	file, err := os.Create("generated/config.json")
+	file, err := os.Create(appName + "/config.json")
 	if err != nil {
 		return err
 	}

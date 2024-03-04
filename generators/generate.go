@@ -22,7 +22,11 @@ import (
 	"golang.org/x/text/language"
 )
 
+var AppName string
+
 func Generate(appJson model.AppJson, dirPath string) (string, model.Errors) {
+
+	AppName = appJson.AppName
 
 	err := GenerateApplicationCode(appJson, appJson.Database, dirPath)
 
@@ -52,7 +56,18 @@ func Generate(appJson model.AppJson, dirPath string) (string, model.Errors) {
 }
 
 func createFiles(name string, dirPath string) {
-	err := os.MkdirAll(dirPath, os.ModeDir)
+
+	_, err := os.Stat(dirPath)
+	if err != nil && !os.IsNotExist(err) {
+		panic(fmt.Sprintf("An error occurred while checking if the directory exists : %s", err.Error()))
+	} else {
+		err := os.RemoveAll(dirPath)
+
+		if err != nil {
+			panic(fmt.Sprintf("An error occurred while deleting existing directory : %s", err.Error()))
+		}
+	}
+	err = os.MkdirAll(dirPath, os.ModeDir)
 
 	if err != nil {
 		panic("Unable to create generated dir")
@@ -74,39 +89,39 @@ func createFiles(name string, dirPath string) {
 		panic("Go mod init failed")
 	}
 
-	err = os.MkdirAll("generated/databases", os.ModeDir)
+	err = os.MkdirAll(name+"/databases", os.ModeDir)
 	if err != nil {
 		panic("Unable to create databases dir")
 	}
 
-	err = os.MkdirAll("generated/service", os.ModeDir)
+	err = os.MkdirAll(name+"/service", os.ModeDir)
 
 	if err != nil {
 		panic("Unable to create service dir")
 	}
 
-	err = os.MkdirAll("generated/controller", os.ModeDir)
+	err = os.MkdirAll(name+"/controller", os.ModeDir)
 	if err != nil {
 		panic("Unable to create controller dir")
 	}
 
-	err = os.MkdirAll("generated/model", os.ModeDir)
+	err = os.MkdirAll(name+"/model", os.ModeDir)
 	if err != nil {
 		panic("Unable to create model dir")
 	}
 
-	err = os.MkdirAll("generated/routes", os.ModeDir)
+	err = os.MkdirAll(name+"/routes", os.ModeDir)
 	if err != nil {
 		panic("Unable to create model dir")
 	}
-	routesFile, err := os.Create("generated/routes/routes.go")
+	routesFile, err := os.Create(name + "/routes/routes.go")
 	if err != nil {
 		panic("Unable to create routes file")
 	}
 
 	defer routesFile.Close()
 
-	mainFile, err := os.Create("generated/main.go")
+	mainFile, err := os.Create(name + "/main.go")
 	if err != nil {
 		panic("Unable to create routes file")
 	}
@@ -114,14 +129,14 @@ func createFiles(name string, dirPath string) {
 	defer mainFile.Close()
 }
 
-func updateModFile() error {
+func updateModFile(dirpath string) error {
 
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 
 	importCommand := exec.Command("goimports", "-l", "-w", ".")
 
-	importCommand.Dir = "./generated/"
+	importCommand.Dir = dirpath + "/"
 	importCommand.Stdin = os.Stdin
 	importCommand.Stdout = &stdout
 	importCommand.Stderr = &stderr
@@ -134,7 +149,7 @@ func updateModFile() error {
 
 	getCommand := exec.Command("go", "get", "-u")
 
-	getCommand.Dir = "./generated/"
+	getCommand.Dir = dirpath + "/"
 	getCommand.Stdin = os.Stdin
 	getCommand.Stdout = &stdout
 	getCommand.Stderr = &stderr
@@ -157,14 +172,14 @@ func CreateServices(structDefs []model.StructDefinition, database string, appNam
 		}
 
 		// Generate CRUD methods and save in service package
-		serviceFileName := fmt.Sprintf("generated/service/%s_service.go", strings.ToLower(structDef.StructName))
+		serviceFileName := fmt.Sprintf(appName+"/service/%s_service.go", strings.ToLower(structDef.StructName))
 		if err := GenerateServiceFile(serviceFileName, structDef, structCode, database, appName); err != nil {
 			fmt.Sprintln(err.Error())
 			return fiber.Map{"error": "Failed to generate service file"}, err
 		}
 
 		// Generate controller methods and save in controller package
-		controllerFileName := fmt.Sprintf("generated/controller/%s_controller.go", strings.ToLower(structDef.StructName))
+		controllerFileName := fmt.Sprintf(appName+"/controller/%s_controller.go", strings.ToLower(structDef.StructName))
 		if err := GenerateControllerFile(controllerFileName, structDef, appName, strings.ToLower(database)); err != nil {
 			return fiber.Map{"error": "Failed to generate controller file"}, err
 		}
@@ -175,6 +190,10 @@ func CreateServices(structDefs []model.StructDefinition, database string, appNam
 }
 
 func GenerateApplicationCode(appJson model.AppJson, database string, dirPath string) error {
+
+	AppName = appJson.AppName
+	generationstatus.AppName = appJson.AppName
+
 	// Parse the incoming JSON data as a StructDefinition
 	var structDefs []model.StructDefinition
 
@@ -231,7 +250,7 @@ func GenerateApplicationCode(appJson model.AppJson, database string, dirPath str
 
 	generationstatus.UpdateGenerationStatus(utils.PACKAGE_IMPORT_START)
 
-	err = updateModFile()
+	err = updateModFile(dirPath)
 
 	if err != nil {
 		log.Println(err.Error())

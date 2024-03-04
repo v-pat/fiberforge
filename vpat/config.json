@@ -1,0 +1,8 @@
+
+{
+	
+	"Database" : "postgres://postgres:postgres@localhost:5432/vpat?sslmode=disable",
+	
+	"Port" : "8080"
+}
+
