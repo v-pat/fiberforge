@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"github.com/spf13/cobra"
-	"golang.org/x/sys/windows"
 )
 
 var rootCmd = &cobra.Command{
@@ -12,14 +11,6 @@ var rootCmd = &cobra.Command{
 }
 
 func init() {
-	// Get the handle to the standard output console
-	handle := windows.Handle(windows.Stdout)
-
-	// Set console mode to enable virtual terminal processing
-	var mode uint32
-	windows.GetConsoleMode(handle, &mode)
-	mode |= windows.ENABLE_VIRTUAL_TERMINAL_PROCESSING
-	windows.SetConsoleMode(handle, mode)
 }
 
 func Execute() {

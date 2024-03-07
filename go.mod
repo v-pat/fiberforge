@@ -11,12 +11,17 @@ require (
 )
 
 require (
+	github.com/aymanbagabas/go-osc52/v2 v2.0.1 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/go-stack/stack v1.8.0 // indirect
 	github.com/gofiber/utils v0.0.10 // indirect
 	github.com/golang/snappy v0.0.1 // indirect
 	github.com/gorilla/schema v1.1.0 // indirect
 	github.com/jinzhu/inflection v1.0.0 // indirect
+	github.com/jwalton/gchalk v1.3.0 // indirect
+	github.com/jwalton/go-supportscolor v1.1.0 // indirect
+	github.com/lucasb-eyer/go-colorful v1.2.0 // indirect
+	github.com/muesli/termenv v0.15.2 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/stretchr/testify v1.8.4 // indirect
@@ -59,7 +64,7 @@ require (
 	go.uber.org/atomic v1.9.0 // indirect
 	go.uber.org/multierr v1.9.0 // indirect
 	golang.org/x/exp v0.0.0-20230905200255-921286631fa9 // indirect
-	golang.org/x/sys v0.15.0 // indirect
+	golang.org/x/sys v0.18.0 // indirect
 	golang.org/x/term v0.15.0 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
