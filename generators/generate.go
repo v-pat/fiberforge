@@ -166,7 +166,7 @@ func updateModFile(dirpath string) error {
 func CreateServices(structDefs []model.StructDefinition, database string, appName string) (fiber.Map, error) {
 	for _, structDef := range structDefs {
 		// Generate Go struct definition
-		structCode, err := GenerateStructFromJSON(structDef.JSONExample, structDef.StructName, strings.ToLower(database))
+		structCode, err := GenerateStructFromJSON(structDef.ColumnsOrFields, structDef.StructName, strings.ToLower(database))
 		if err != nil {
 			return fiber.Map{"error": "Failed to generate struct"}, err
 		}

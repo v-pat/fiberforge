@@ -9,9 +9,9 @@ type AppJson struct {
 
 // StructDefinition represents the data required for generating CRUD methods.
 type StructDefinition struct {
-	StructName  string                 `json:"name"`
-	JSONExample map[string]interface{} `json:"columns"`
-	Endpoint    string                 `json:"endpoint"`
+	StructName      string                 `json:"name"`
+	ColumnsOrFields map[string]interface{} `json:"columns"`
+	Endpoint        string                 `json:"endpoint"`
 }
 
 // custom errors
