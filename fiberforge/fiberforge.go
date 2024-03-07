@@ -5,30 +5,26 @@ const (
 	FILE_MATERIAL
 )
 
-type MaterialType struct {
-	Material int
+type materialType struct {
+	material int
 }
 
-var jsonMaterial = MaterialType{
-	Material: JSON_MATERIAL,
+var JsonMaterial = materialType{
+	material: JSON_MATERIAL,
 }
 
-var fileMaterial = MaterialType{
-	Material: FILE_MATERIAL,
+var FileMaterial = materialType{
+	material: FILE_MATERIAL,
 }
 
-func JsonMaterial() MaterialType {
-	return jsonMaterial
-}
-
-func FileMaterial() MaterialType {
-	return fileMaterial
-}
-
-func Forge(materialType MaterialType, material map[string]interface{}) error {
-	if materialType.Material == FILE_MATERIAL {
+func Forge(materialType materialType, material map[string]interface{}) error {
+	if materialType.material == FILE_MATERIAL {
 
 	}
 
 	return nil
+}
+
+func Ignite() {
+
 }

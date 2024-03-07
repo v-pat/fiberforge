@@ -9,6 +9,7 @@ import (
 
 	"github.com/briandowns/spinner"
 	"github.com/gofiber/fiber"
+	"github.com/jwalton/gchalk"
 	"github.com/spf13/cobra"
 	generationstatus "github.com/v-pat/fiberforge/generation_status"
 	"github.com/v-pat/fiberforge/generators"
@@ -21,31 +22,45 @@ var setUpCmd = &cobra.Command{
 	Short: "a CLI to create a boilerpate code for go fiber project",
 	Long:  "setup command takes database and name of project terminal and create setup of your project",
 	Run: func(cmd *cobra.Command, args []string) {
-		setupCmdHandler()
+		setupCmdHandler(cmd)
 	},
 }
 
 func init() {
+	setUpCmd.PersistentFlags().StringP("name", "n", "", "Name of project")
+	setUpCmd.PersistentFlags().StringP("db", "d", "", "Database for your project. Availabel options are mongodb, mysql and postgres.")
 	rootCmd.AddCommand(setUpCmd)
 }
 
-func setupCmdHandler() model.Errors {
+func setupCmdHandler(cmd *cobra.Command) model.Errors {
 
 	scanner := bufio.NewScanner(os.Stdin)
 
-	fmt.Println("\x1b[32m> \x1b[34mWhat is name of your application\x1b[0m?")
-	fmt.Print("\x1b[34m> \x1b[0m")
+	appName, _ := cmd.Flags().GetString("name")
+	db, _ := cmd.Flags().GetString("db")
 
-	scanner.Scan()
+	if appName == "" {
 
-	appName := scanner.Text()
+		// fmt.Println("\x1b[32m> \x1b[34mWhat is name of your application\x1b[0m?")
+		// fmt.Print("\x1b[34m> \x1b[0m")
 
-	fmt.Println("\x1b[32m> \x1b[34mWhich database you want to use\x1b[0m? \x1b[0mavailable options are \x1b[32mmongodb, mysql and postgres.\x1b[0m")
-	fmt.Print("\x1b[34m> \x1b[0m")
+		fmt.Println(gchalk.Green("> ") + gchalk.Blue("What is name of your application") + "?")
+		fmt.Print(gchalk.Blue("> "))
 
-	scanner.Scan()
+		scanner.Scan()
 
-	db := scanner.Text()
+		appName = scanner.Text()
+	}
+
+	if db == "" {
+
+		fmt.Println(gchalk.Green("> ") + gchalk.Blue("Which database you want to use") + "? available options are" + gchalk.Green(" mongodb, mysql and postgres."))
+		fmt.Print(gchalk.Blue("> "))
+
+		scanner.Scan()
+
+		db = scanner.Text()
+	}
 
 	appJson := model.AppJson{
 		AppName:  appName,
