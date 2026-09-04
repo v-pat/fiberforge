@@ -9,7 +9,7 @@ This package simply downloads and wraps the pre-compiled Go binary, making it ex
 You can use FiberForge directly via `npx` without installing it globally:
 
 ```bash
-npx fiberforge scaffold examples/blog.yaml
+npx fiberforge-cli scaffold examples/blog.yaml
 ```
 
 To create a new project interactively:

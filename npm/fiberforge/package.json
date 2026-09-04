@@ -1,5 +1,5 @@
 {
-  "name": "fiberforge",
+  "name": "fiberforge-cli",
   "version": "1.0.0",
   "description": "Deterministic, schema-driven Go Fiber project scaffolder with an embedded MCP server",
   "main": "run.js",

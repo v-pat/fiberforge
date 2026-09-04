@@ -95,7 +95,7 @@ Add FiberForge to your editor's MCP config:
   "mcpServers": {
     "fiberforge": {
       "command": "npx",
-      "args": ["-y", "fiberforge", "serve"]
+      "args": ["-y", "fiberforge-cli", "serve"]
     }
   }
 }
