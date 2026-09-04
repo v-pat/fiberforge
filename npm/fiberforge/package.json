@@ -1,6 +1,6 @@
 {
   "name": "fiberforge",
-  "version": "2.0.0",
+  "version": "1.0.0",
   "description": "Deterministic, schema-driven Go Fiber project scaffolder with an embedded MCP server",
   "main": "run.js",
   "bin": {
