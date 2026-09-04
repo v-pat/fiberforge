@@ -5,7 +5,7 @@ const path = require('path');
 const os = require('os');
 const fs = require('fs');
 
-const binName = os.platform() === 'win32' ? 'forge.exe' : 'forge';
+const binName = os.platform() === 'win32' ? 'fiberforge.exe' : 'fiberforge';
 const binPath = path.join(__dirname, 'bin', binName);
 
 if (!fs.existsSync(binPath)) {

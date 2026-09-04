@@ -4,8 +4,7 @@
   "description": "Deterministic, schema-driven Go Fiber project scaffolder with an embedded MCP server",
   "main": "run.js",
   "bin": {
-    "fiberforge": "run.js",
-    "forge": "run.js"
+    "fiberforge": "run.js"
   },
   "scripts": {
     "postinstall": "node install.js"

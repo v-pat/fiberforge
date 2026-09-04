@@ -1,6 +1,6 @@
 # FiberForge ⚡
 
-**FiberForge** (`forge`) is a high-performance Go CLI and MCP server that generates complete, production-grade **Go Fiber (v2)** REST API backends from a declarative YAML or JSON schema.
+**FiberForge** (`fiberforge`) is a high-performance Go CLI and MCP server that generates complete, production-grade **Go Fiber (v2)** REST API backends from a declarative YAML or JSON schema.
 
 Give it a schema describing your domain entities and features, and FiberForge scaffolds clean, deterministic code: GORM/MGM database models, business logic services, Fiber controllers, JWT authentication, versioned SQL migrations, Swagger docs, Docker containerization, structured `log/slog` logging, graceful shutdown, health probes, and unit tests.
 
@@ -22,8 +22,8 @@ Give it a schema describing your domain entities and features, and FiberForge sc
   - Docker Compose with container healthchecks.
   - GitHub Actions CI workflow with `golangci-lint` and race-detector testing.
 - **Dual Mode (Single Binary)**:
-  - CLI mode (`forge scaffold`, `forge init`, `--dry-run`).
-  - Agentic MCP server (`forge serve`) exposing 5 tools over stdio JSON-RPC 2.0.
+  - CLI mode (`fiberforge scaffold`, `fiberforge init`, `--dry-run`).
+  - Agentic MCP server (`fiberforge serve`) exposing 5 tools over stdio JSON-RPC 2.0.
 
 ---
 
@@ -32,7 +32,7 @@ Give it a schema describing your domain entities and features, and FiberForge sc
 ### Via NPM / NPX (Recommended for quick start)
 You don't even need Go installed to use FiberForge. Just run it via `npx`:
 ```bash
-npx fiberforge init
+npx fiberfiberforge init
 ```
 
 ### Via Go
@@ -44,44 +44,44 @@ go install github.com/v-pat/fiberforge@latest
 ```bash
 git clone https://github.com/v-pat/fiberforge.git
 cd fiberforge
-go build -o forge .
+go build -o fiberforge .
 ```
 
 ---
 
 ## Usage
 
-### 1. Interactive TUI Wizard (`forge init`)
+### 1. Interactive TUI Wizard (`fiberforge init`)
 
 Launch an interactive terminal UI powered by Charm's `huh` to configure your app, pick features, and build models visually:
 
 ```bash
-forge init
+fiberforge init
 ```
 
 Generates a `fiberforge.yaml` schema and offers to scaffold immediately.
 
-### 2. CLI Scaffold (`forge scaffold`)
+### 2. CLI Scaffold (`fiberforge scaffold`)
 
 Scaffold a project deterministically from a schema file:
 
 ```bash
-forge scaffold examples/blog.yaml
-forge scaffold examples/ecommerce.yaml --output-dir /tmp/my-store
+fiberforge scaffold examples/blog.yaml
+fiberforge scaffold examples/ecommerce.yaml --output-dir /tmp/my-store
 ```
 
 Preview generated files without touching disk:
 
 ```bash
-forge scaffold examples/blog.yaml --dry-run
+fiberforge scaffold examples/blog.yaml --dry-run
 ```
 
-### 3. AI Agent MCP Server (`forge serve`)
+### 3. AI Agent MCP Server (`fiberforge serve`)
 
 Run FiberForge as a Model Context Protocol (MCP) server over stdio for AI coding agents (**Claude Code**, **Cursor**, **Cline**, **Windsurf**):
 
 ```bash
-forge serve
+fiberforge serve
 ```
 
 #### MCP Client Configuration
@@ -101,7 +101,7 @@ Add FiberForge to your editor's MCP config:
 }
 ```
 
-*(If you installed via Go, you can use `"command": "forge", "args": ["serve"]` instead)*
+*(If you installed via Go, you can use `"command": "fiberforge", "args": ["serve"]` instead)*
 
 #### Exposed MCP Tools
 

@@ -5,7 +5,7 @@ const os = require('os');
 const { execSync } = require('child_process');
 
 const version = require('./package.json').version;
-const binName = os.platform() === 'win32' ? 'forge.exe' : 'forge';
+const binName = os.platform() === 'win32' ? 'fiberforge.exe' : 'fiberforge';
 const binDir = path.join(__dirname, 'bin');
 const binPath = path.join(binDir, binName);
 
