@@ -15,7 +15,7 @@ npx fiberforge scaffold examples/blog.yaml
 To create a new project interactively:
 
 ```bash
-npx fiberforge init
+npx fiberfiberforge init
 ```
 
 ## Global Installation
@@ -24,9 +24,9 @@ npx fiberforge init
 npm install -g fiberforge
 
 # Now you can use it anywhere
-forge init
-# OR
 fiberforge init
+# OR
+fiberfiberforge init
 ```
 
 ## Features

@@ -5,7 +5,7 @@ import (
 )
 
 var rootCmd = &cobra.Command{
-	Use:           "forge",
+	Use:           "fiberforge",
 	Short:         "FiberForge — scaffold production-ready Go Fiber backends",
 	Version:       "v2.0.0",
 	SilenceUsage:  true,

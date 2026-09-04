@@ -5,8 +5,8 @@ before:
     - go mod tidy
 
 builds:
-  - id: forge
-    binary: forge
+  - id: fiberforge
+    binary: fiberforge
     main: .
     env:
       - CGO_ENABLED=0
