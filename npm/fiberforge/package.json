@@ -1,0 +1,38 @@
+{
+  "name": "fiberforge",
+  "version": "2.0.0",
+  "description": "Deterministic, schema-driven Go Fiber project scaffolder with an embedded MCP server",
+  "main": "run.js",
+  "bin": {
+    "fiberforge": "run.js",
+    "forge": "run.js"
+  },
+  "scripts": {
+    "postinstall": "node install.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/v-pat/fiberforge.git"
+  },
+  "keywords": [
+    "go",
+    "golang",
+    "fiber",
+    "gofiber",
+    "scaffold",
+    "generator",
+    "mcp",
+    "ai",
+    "cli"
+  ],
+  "author": "Vaibhav Pathak",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/v-pat/fiberforge/issues"
+  },
+  "homepage": "https://github.com/v-pat/fiberforge#readme",
+  "engines": {
+    "node": ">= 14"
+  }
+}
+

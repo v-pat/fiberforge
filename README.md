@@ -29,12 +29,18 @@ Give it a schema describing your domain entities and features, and FiberForge sc
 
 ## Installation
 
+### Via NPM / NPX (Recommended for quick start)
+You don't even need Go installed to use FiberForge. Just run it via `npx`:
+```bash
+npx fiberforge init
+```
+
+### Via Go
 ```bash
 go install github.com/v-pat/fiberforge@latest
 ```
 
-Or build from source:
-
+### From Source
 ```bash
 git clone https://github.com/v-pat/fiberforge.git
 cd fiberforge
@@ -88,12 +94,14 @@ Add FiberForge to your editor's MCP config:
 {
   "mcpServers": {
     "fiberforge": {
-      "command": "forge",
-      "args": ["serve"]
+      "command": "npx",
+      "args": ["-y", "fiberforge", "serve"]
     }
   }
 }
 ```
+
+*(If you installed via Go, you can use `"command": "forge", "args": ["serve"]` instead)*
 
 #### Exposed MCP Tools
 
