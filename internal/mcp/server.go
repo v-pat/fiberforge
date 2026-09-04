@@ -78,7 +78,7 @@ func (s *Server) dispatch(req rpcRequest) {
 			"capabilities": map[string]any{
 				"tools": map[string]any{},
 			},
-			"serverInfo": map[string]any{"name": "fiberforge", "version": "2.0.0"},
+			"serverInfo": map[string]any{"name": "fiberforge", "version": "1.0.0"},
 		}
 	case "notifications/initialized", "notifications/cancelled":
 		// Fire and forget; no reply.
