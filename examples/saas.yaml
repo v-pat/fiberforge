@@ -1,0 +1,40 @@
+appName: saas
+framework: fiber
+database: postgres
+port: 8080
+
+features:
+  auth: true
+  docker: true
+  migrations: true
+  swagger: true
+  cors: true
+  logging: true
+  testing: true
+
+models:
+  - name: organization
+    endpoint: organizations
+    auth: true
+    fields:
+      - name: name
+        type: string
+        required: true
+      - name: domain
+        type: string
+        unique: true
+
+  - name: subscription
+    endpoint: subscriptions
+    auth: true
+    fields:
+      - name: plan
+        type: enum
+        values: [free, pro, enterprise]
+      - name: active
+        type: bool
+        default: "true"
+    relationships:
+      - type: belongsTo
+        model: organization
+

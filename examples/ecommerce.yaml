@@ -1,0 +1,61 @@
+appName: ecommerce
+framework: fiber
+database: postgres
+port: 8080
+
+features:
+  auth: true
+  docker: true
+  migrations: true
+  swagger: true
+  rateLimit: true
+  cors: true
+  logging: true
+  testing: true
+  ci: true
+
+models:
+  - name: category
+    endpoint: categories
+    fields:
+      - name: name
+        type: string
+        required: true
+        unique: true
+      - name: slug
+        type: string
+        required: true
+        unique: true
+
+  - name: product
+    endpoint: products
+    fields:
+      - name: title
+        type: string
+        required: true
+      - name: description
+        type: text
+      - name: price
+        type: float
+        required: true
+      - name: stock
+        type: int
+        required: true
+    relationships:
+      - type: belongsTo
+        model: category
+
+  - name: order
+    endpoint: orders
+    auth: true
+    fields:
+      - name: total
+        type: float
+        required: true
+      - name: status
+        type: enum
+        values: [pending, paid, shipped, cancelled]
+    relationships:
+      - type: belongsTo
+        model: user
+

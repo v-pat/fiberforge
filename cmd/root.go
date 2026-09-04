@@ -5,12 +5,14 @@ import (
 )
 
 var rootCmd = &cobra.Command{
-	Use:     "fiberforge [command]",
-	Short:   "A CLI to get started with go fiber app instantly",
-	Long:    "Fiberforge will create a backend setup or based on your input, even generate CRUD APIs for your tables/collections.",
-	Version: "v0.0.7",
+	Use:           "forge",
+	Short:         "FiberForge — scaffold production-ready Go Fiber backends",
+	Version:       "v2.0.0",
+	SilenceUsage:  true,
+	SilenceErrors: true,
 }
 
-func Execute() {
-	cobra.CheckErr(rootCmd.Execute())
+// Execute runs the root command.
+func Execute() error {
+	return rootCmd.Execute()
 }
