@@ -1,0 +1,50 @@
+appName: blog
+database: postgres
+port: 8080
+
+features:
+  auth: true
+  docker: true
+  migrations: true
+  swagger: true
+  rateLimit: true
+  cors: true
+  logging: true
+  testing: true
+  ci: true
+
+models:
+  - name: user
+    endpoint: users
+    fields:
+      - name: email
+        type: string
+        required: true
+        unique: true
+        validation: email
+      - name: password
+        type: password
+        required: true
+        sensitive: true
+    relationships:
+      - type: hasMany
+        model: post
+
+  - name: post
+    endpoint: posts
+    auth: true
+    fields:
+      - name: title
+        type: string
+        required: true
+      - name: body
+        type: text
+      - name: published
+        type: bool
+        default: "false"
+      - name: rating
+        type: enum
+        values: [low, medium, high]
+    relationships:
+      - type: belongsTo
+        model: user

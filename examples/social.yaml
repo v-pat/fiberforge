@@ -1,0 +1,42 @@
+appName: social
+framework: fiber
+database: mongodb
+port: 8080
+
+features:
+  auth: true
+  docker: true
+  swagger: true
+  rateLimit: true
+  cors: true
+  logging: true
+  testing: true
+
+models:
+  - name: post
+    endpoint: posts
+    auth: true
+    fields:
+      - name: content
+        type: text
+        required: true
+      - name: likesCount
+        type: int
+        default: "0"
+    relationships:
+      - type: belongsTo
+        model: user
+
+  - name: comment
+    endpoint: comments
+    auth: true
+    fields:
+      - name: text
+        type: string
+        required: true
+    relationships:
+      - type: belongsTo
+        model: post
+      - type: belongsTo
+        model: user
+
