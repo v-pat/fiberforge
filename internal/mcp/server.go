@@ -7,6 +7,8 @@ import (
 	"io"
 	"strings"
 
+	"github.com/v-pat/fiberforge/examples"
+
 	"github.com/v-pat/fiberforge/internal/engine"
 	"github.com/v-pat/fiberforge/internal/schema"
 )
@@ -228,85 +230,8 @@ func (s *Server) getSchemaTemplate(args json.RawMessage) (any, *rpcError) {
 	_ = json.Unmarshal(args, &input)
 	name := strings.ToLower(input.Name)
 
-	templates := map[string]string{
-		"blog": `appName: blog
-framework: fiber
-database: postgres
-port: 8080
-features:
-  auth: true
-  docker: true
-  migrations: true
-  swagger: true
-models:
-  - name: post
-    endpoint: posts
-    fields:
-      - name: title
-        type: string
-        required: true
-      - name: content
-        type: text
-    relationships:
-      - type: belongsTo
-        model: user`,
-		"ecommerce": `appName: store
-framework: fiber
-database: postgres
-port: 8080
-features:
-  auth: true
-  docker: true
-  migrations: true
-  swagger: true
-  rateLimit: true
-models:
-  - name: product
-    endpoint: products
-    fields:
-      - name: name
-        type: string
-        required: true
-      - name: price
-        type: float
-        required: true`,
-		"saas": `appName: saas
-framework: fiber
-database: postgres
-port: 8080
-features:
-  auth: true
-  docker: true
-  migrations: true
-  cors: true
-models:
-  - name: organization
-    endpoint: organizations
-    auth: true
-    fields:
-      - name: name
-        type: string
-        required: true`,
-		"social": `appName: social
-framework: fiber
-database: mongodb
-port: 8080
-features:
-  auth: true
-  docker: true
-  swagger: true
-models:
-  - name: post
-    endpoint: posts
-    auth: true
-    fields:
-      - name: content
-        type: text
-        required: true`,
-	}
-
-	tmpl, ok := templates[name]
-	if !ok {
+	content, err := examples.Get(name)
+	if err != nil {
 		return map[string]any{
 			"content": []any{
 				map[string]any{
@@ -317,6 +242,7 @@ models:
 			"isError": true,
 		}, nil
 	}
+	tmpl := string(content)
 
 	return map[string]any{
 		"content": []any{

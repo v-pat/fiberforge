@@ -16,62 +16,68 @@ import (
 func Create{{.Name}}(c *fiber.Ctx) error {
 	var m model.{{.Name}}
 	if err := c.BodyParser(&m); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
+		return SendError(c, fiber.StatusBadRequest, "INVALID_REQUEST", "invalid request body", nil)
+	}
+	if errs := ValidateStruct(&m); len(errs) > 0 {
+		return SendError(c, fiber.StatusBadRequest, "VALIDATION_FAILED", "invalid request payload", errs)
 	}
 	if err := service.Create{{.Name}}(&m); err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		return SendError(c, fiber.StatusInternalServerError, "INTERNAL_ERROR", err.Error(), nil)
 	}
-	return c.Status(fiber.StatusCreated).JSON(m)
+	return SendSuccess(c, fiber.StatusCreated, m)
 }
 
 // List{{.Name}}s handles GET /{{.Endpoint}}.
 func List{{.Name}}s(c *fiber.Ctx) error {
 	items, err := service.List{{.Name}}s()
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		return SendError(c, fiber.StatusInternalServerError, "INTERNAL_ERROR", err.Error(), nil)
 	}
-	return c.JSON(items)
+	return SendSuccess(c, fiber.StatusOK, items)
 }
 
 // Get{{.Name}}ByID handles GET /{{.Endpoint}}/:id.
 func Get{{.Name}}ByID(c *fiber.Ctx) error {
 	id, err := strconv.ParseUint(c.Params("id"), 10, 64)
 	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid id"})
+		return SendError(c, fiber.StatusBadRequest, "INVALID_ID", "invalid id", nil)
 	}
 	m, err := service.Get{{.Name}}ByID(uint(id))
 	if err != nil {
-		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": err.Error()})
+		return SendError(c, fiber.StatusNotFound, "NOT_FOUND", err.Error(), nil)
 	}
-	return c.JSON(m)
+	return SendSuccess(c, fiber.StatusOK, m)
 }
 
 // Update{{.Name}} handles PUT /{{.Endpoint}}/:id.
 func Update{{.Name}}(c *fiber.Ctx) error {
 	id, err := strconv.ParseUint(c.Params("id"), 10, 64)
 	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid id"})
+		return SendError(c, fiber.StatusBadRequest, "INVALID_ID", "invalid id", nil)
 	}
 	var patch model.{{.Name}}
 	if err := c.BodyParser(&patch); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
+		return SendError(c, fiber.StatusBadRequest, "INVALID_REQUEST", "invalid request body", nil)
+	}
+	if errs := ValidateStruct(&patch); len(errs) > 0 {
+		return SendError(c, fiber.StatusBadRequest, "VALIDATION_FAILED", "invalid request payload", errs)
 	}
 	if err := service.Update{{.Name}}(uint(id), &patch); err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		return SendError(c, fiber.StatusInternalServerError, "INTERNAL_ERROR", err.Error(), nil)
 	}
-	return c.JSON(fiber.Map{"message": "{{.Name}} updated"})
+	return SendSuccess(c, fiber.StatusOK, fiber.Map{"message": "{{.Name}} updated"})
 }
 
 // Delete{{.Name}}ByID handles DELETE /{{.Endpoint}}/:id.
 func Delete{{.Name}}ByID(c *fiber.Ctx) error {
 	id, err := strconv.ParseUint(c.Params("id"), 10, 64)
 	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid id"})
+		return SendError(c, fiber.StatusBadRequest, "INVALID_ID", "invalid id", nil)
 	}
 	if err := service.Delete{{.Name}}ByID(uint(id)); err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		return SendError(c, fiber.StatusInternalServerError, "INTERNAL_ERROR", err.Error(), nil)
 	}
-	return c.JSON(fiber.Map{"message": "{{.Name}} deleted"})
+	return SendSuccess(c, fiber.StatusOK, fiber.Map{"message": "{{.Name}} deleted"})
 }
 `
 
@@ -89,49 +95,55 @@ import (
 func Create{{.Name}}(c *fiber.Ctx) error {
 	var m model.{{.Name}}
 	if err := c.BodyParser(&m); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
+		return SendError(c, fiber.StatusBadRequest, "INVALID_REQUEST", "invalid request body", nil)
+	}
+	if errs := ValidateStruct(&m); len(errs) > 0 {
+		return SendError(c, fiber.StatusBadRequest, "VALIDATION_FAILED", "invalid request payload", errs)
 	}
 	if err := service.Create{{.Name}}(&m); err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		return SendError(c, fiber.StatusInternalServerError, "INTERNAL_ERROR", err.Error(), nil)
 	}
-	return c.Status(fiber.StatusCreated).JSON(m)
+	return SendSuccess(c, fiber.StatusCreated, m)
 }
 
 // List{{.Name}}s handles GET /{{.Endpoint}}.
 func List{{.Name}}s(c *fiber.Ctx) error {
 	items, err := service.List{{.Name}}s()
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		return SendError(c, fiber.StatusInternalServerError, "INTERNAL_ERROR", err.Error(), nil)
 	}
-	return c.JSON(items)
+	return SendSuccess(c, fiber.StatusOK, items)
 }
 
 // Get{{.Name}}ByID handles GET /{{.Endpoint}}/:id.
 func Get{{.Name}}ByID(c *fiber.Ctx) error {
 	m, err := service.Get{{.Name}}ByID(c.Params("id"))
 	if err != nil {
-		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": err.Error()})
+		return SendError(c, fiber.StatusNotFound, "NOT_FOUND", err.Error(), nil)
 	}
-	return c.JSON(m)
+	return SendSuccess(c, fiber.StatusOK, m)
 }
 
 // Update{{.Name}} handles PUT /{{.Endpoint}}/:id.
 func Update{{.Name}}(c *fiber.Ctx) error {
 	var patch model.{{.Name}}
 	if err := c.BodyParser(&patch); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
+		return SendError(c, fiber.StatusBadRequest, "INVALID_REQUEST", "invalid request body", nil)
+	}
+	if errs := ValidateStruct(&patch); len(errs) > 0 {
+		return SendError(c, fiber.StatusBadRequest, "VALIDATION_FAILED", "invalid request payload", errs)
 	}
 	if err := service.Update{{.Name}}(c.Params("id"), &patch); err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		return SendError(c, fiber.StatusInternalServerError, "INTERNAL_ERROR", err.Error(), nil)
 	}
-	return c.JSON(fiber.Map{"message": "{{.Name}} updated"})
+	return SendSuccess(c, fiber.StatusOK, fiber.Map{"message": "{{.Name}} updated"})
 }
 
 // Delete{{.Name}}ByID handles DELETE /{{.Endpoint}}/:id.
 func Delete{{.Name}}ByID(c *fiber.Ctx) error {
 	if err := service.Delete{{.Name}}ByID(c.Params("id")); err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		return SendError(c, fiber.StatusInternalServerError, "INTERNAL_ERROR", err.Error(), nil)
 	}
-	return c.JSON(fiber.Map{"message": "{{.Name}} deleted"})
+	return SendSuccess(c, fiber.StatusOK, fiber.Map{"message": "{{.Name}} deleted"})
 }
 `

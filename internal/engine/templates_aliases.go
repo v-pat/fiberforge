@@ -17,6 +17,7 @@ var (
 	serviceTemplate              = tmpl.ServiceTemplate
 	mongoServiceTemplate         = tmpl.MongoServiceTemplate
 	controllerTemplate           = tmpl.ControllerTemplate
+	controllerUtilsTemplate      = tmpl.ControllerUtilsTemplate
 	mongoControllerTemplate      = tmpl.MongoControllerTemplate
 	routesTemplate               = tmpl.RoutesTemplate
 	mainTemplate                 = tmpl.MainTemplate
@@ -24,7 +25,6 @@ var (
 	swaggerJSONTemplate          = tmpl.SwaggerJSONTemplate
 	controllerTestTemplate       = tmpl.ControllerTestTemplate
 	authTestTemplate             = tmpl.AuthTestTemplate
-	migrateCmdTemplate           = tmpl.MigrateCmdTemplate
 	authPasswordTemplate         = tmpl.AuthTemplate
 	authJWTTemplate              = tmpl.JWTTemplate
 	mongoAuthJWTTemplate         = tmpl.MongoJWTTemplate

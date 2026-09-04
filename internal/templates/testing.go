@@ -18,7 +18,7 @@ import (
 
 // TestList{{.Name}}s tests the List{{.Name}}s handler.
 func TestList{{.Name}}s(t *testing.T) {
-	if databases.DB == nil {
+	if err := databases.Ping(); err != nil {
 		t.Skip("skipping test: database not connected")
 	}
 	app := fiber.New()
@@ -35,7 +35,7 @@ func TestList{{.Name}}s(t *testing.T) {
 
 // TestCreate{{.Name}} tests the Create{{.Name}} handler.
 func TestCreate{{.Name}}(t *testing.T) {
-	if databases.DB == nil {
+	if err := databases.Ping(); err != nil {
 		t.Skip("skipping test: database not connected")
 	}
 	app := fiber.New()
@@ -70,7 +70,7 @@ import (
 
 // TestRegisterLogin tests the register and login handlers.
 func TestRegisterLogin(t *testing.T) {
-	if databases.DB == nil {
+	if err := databases.Ping(); err != nil {
 		t.Skip("skipping test: database not connected")
 	}
 	app := fiber.New()

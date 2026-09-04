@@ -92,15 +92,15 @@ func JWT(secret []byte) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		h := c.Get("Authorization")
 		if h == "" {
-			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "missing authorization header"})
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"success": false, "error": fiber.Map{"code": "UNAUTHORIZED", "message": "missing authorization header"}})
 		}
 		parts := strings.SplitN(h, " ", 2)
 		if len(parts) != 2 || !strings.EqualFold(parts[0], "Bearer") {
-			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "malformed authorization header"})
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"success": false, "error": fiber.Map{"code": "UNAUTHORIZED", "message": "malformed authorization header"}})
 		}
 		uid, err := auth.ValidateToken(parts[1])
 		if err != nil {
-			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "invalid or expired token"})
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"success": false, "error": fiber.Map{"code": "UNAUTHORIZED", "message": "invalid or expired token"}})
 		}
 		c.Locals("userId", uid)
 		return c.Next()
@@ -259,60 +259,66 @@ type credentials struct {
 func Register(c *fiber.Ctx) error {
 	var req credentials
 	if err := c.BodyParser(&req); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
+		return SendError(c, fiber.StatusBadRequest, "INVALID_REQUEST", "invalid request body", nil)
+	}
+	if errs := ValidateStruct(&req); len(errs) > 0 {
+		return SendError(c, fiber.StatusBadRequest, "VALIDATION_FAILED", "invalid request payload", errs)
 	}
 	user, err := auth.Register(req.Email, req.Password)
 	if err != nil {
-		return c.Status(fiber.StatusConflict).JSON(fiber.Map{"error": err.Error()})
+		return SendError(c, fiber.StatusConflict, "CONFLICT", err.Error(), nil)
 	}
 	token, err := auth.GenerateToken(user.ID)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to issue token"})
+		return SendError(c, fiber.StatusInternalServerError, "INTERNAL_ERROR", "failed to issue token", nil)
 	}
-	return c.Status(fiber.StatusCreated).JSON(fiber.Map{"token": token})
+	return SendSuccess(c, fiber.StatusCreated, fiber.Map{"token": token})
 }
 
 // Login handles POST /api/auth/login.
 func Login(c *fiber.Ctx) error {
 	var req credentials
 	if err := c.BodyParser(&req); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
+		return SendError(c, fiber.StatusBadRequest, "INVALID_REQUEST", "invalid request body", nil)
+	}
+	if errs := ValidateStruct(&req); len(errs) > 0 {
+		return SendError(c, fiber.StatusBadRequest, "VALIDATION_FAILED", "invalid request payload", errs)
 	}
 	user, err := auth.Login(req.Email, req.Password)
 	if err != nil {
-		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": err.Error()})
+		return SendError(c, fiber.StatusUnauthorized, "UNAUTHORIZED", err.Error(), nil)
 	}
 	token, err := auth.GenerateToken(user.ID)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to issue token"})
+		return SendError(c, fiber.StatusInternalServerError, "INTERNAL_ERROR", "failed to issue token", nil)
 	}
-	return c.JSON(fiber.Map{"token": token})
+	return SendSuccess(c, fiber.StatusOK, fiber.Map{"token": token})
 }
 
 // Me handles GET /api/auth/me (protected).
 func Me(c *fiber.Ctx) error {
 	id, ok := c.Locals("userId").(uint)
 	if !ok {
-		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "unauthenticated"})
+		return SendError(c, fiber.StatusUnauthorized, "UNAUTHENTICATED", "unauthenticated", nil)
 	}
 	m, err := service.GetUserByID(id)
 	if err != nil {
-		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": err.Error()})
+		return SendError(c, fiber.StatusNotFound, "NOT_FOUND", err.Error(), nil)
 	}
-	return c.JSON(m)
+	return SendSuccess(c, fiber.StatusOK, m)
 }
 
 // Refresh re-issues a token for the authenticated user (protected).
 func Refresh(c *fiber.Ctx) error {
 	id, ok := c.Locals("userId").(uint)
 	if !ok {
-		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "unauthenticated"})
+		return SendError(c, fiber.StatusUnauthorized, "UNAUTHENTICATED", "unauthenticated", nil)
 	}
 	token, err := auth.GenerateToken(id)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to issue token"})
+		return SendError(c, fiber.StatusInternalServerError, "INTERNAL_ERROR", "failed to issue token", nil)
 	}
-	return c.JSON(fiber.Map{"token": token})
+	return SendSuccess(c, fiber.StatusOK, fiber.Map{"token": token})
 }
 `
 
@@ -336,60 +342,66 @@ type credentials struct {
 func Register(c *fiber.Ctx) error {
 	var req credentials
 	if err := c.BodyParser(&req); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
+		return SendError(c, fiber.StatusBadRequest, "INVALID_REQUEST", "invalid request body", nil)
+	}
+	if errs := ValidateStruct(&req); len(errs) > 0 {
+		return SendError(c, fiber.StatusBadRequest, "VALIDATION_FAILED", "invalid request payload", errs)
 	}
 	user, err := auth.Register(req.Email, req.Password)
 	if err != nil {
-		return c.Status(fiber.StatusConflict).JSON(fiber.Map{"error": err.Error()})
+		return SendError(c, fiber.StatusConflict, "CONFLICT", err.Error(), nil)
 	}
 	token, err := auth.GenerateToken(user.ID.Hex())
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to issue token"})
+		return SendError(c, fiber.StatusInternalServerError, "INTERNAL_ERROR", "failed to issue token", nil)
 	}
-	return c.Status(fiber.StatusCreated).JSON(fiber.Map{"token": token})
+	return SendSuccess(c, fiber.StatusCreated, fiber.Map{"token": token})
 }
 
 // Login handles POST /api/auth/login.
 func Login(c *fiber.Ctx) error {
 	var req credentials
 	if err := c.BodyParser(&req); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
+		return SendError(c, fiber.StatusBadRequest, "INVALID_REQUEST", "invalid request body", nil)
+	}
+	if errs := ValidateStruct(&req); len(errs) > 0 {
+		return SendError(c, fiber.StatusBadRequest, "VALIDATION_FAILED", "invalid request payload", errs)
 	}
 	user, err := auth.Login(req.Email, req.Password)
 	if err != nil {
-		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": err.Error()})
+		return SendError(c, fiber.StatusUnauthorized, "UNAUTHORIZED", err.Error(), nil)
 	}
 	token, err := auth.GenerateToken(user.ID.Hex())
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to issue token"})
+		return SendError(c, fiber.StatusInternalServerError, "INTERNAL_ERROR", "failed to issue token", nil)
 	}
-	return c.JSON(fiber.Map{"token": token})
+	return SendSuccess(c, fiber.StatusOK, fiber.Map{"token": token})
 }
 
 // Me handles GET /api/auth/me (protected).
 func Me(c *fiber.Ctx) error {
 	id, ok := c.Locals("userId").(string)
 	if !ok {
-		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "unauthenticated"})
+		return SendError(c, fiber.StatusUnauthorized, "UNAUTHENTICATED", "unauthenticated", nil)
 	}
 	m, err := service.GetUserByID(id)
 	if err != nil {
-		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": err.Error()})
+		return SendError(c, fiber.StatusNotFound, "NOT_FOUND", err.Error(), nil)
 	}
-	return c.JSON(m)
+	return SendSuccess(c, fiber.StatusOK, m)
 }
 
 // Refresh re-issues a token for the authenticated user (protected).
 func Refresh(c *fiber.Ctx) error {
 	id, ok := c.Locals("userId").(string)
 	if !ok {
-		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "unauthenticated"})
+		return SendError(c, fiber.StatusUnauthorized, "UNAUTHENTICATED", "unauthenticated", nil)
 	}
 	token, err := auth.GenerateToken(id)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to issue token"})
+		return SendError(c, fiber.StatusInternalServerError, "INTERNAL_ERROR", "failed to issue token", nil)
 	}
-	return c.JSON(fiber.Map{"token": token})
+	return SendSuccess(c, fiber.StatusOK, fiber.Map{"token": token})
 }
 `
 
@@ -466,15 +478,15 @@ func JWT(secret []byte) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		h := c.Get("Authorization")
 		if h == "" {
-			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "missing authorization header"})
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"success": false, "error": fiber.Map{"code": "UNAUTHORIZED", "message": "missing authorization header"}})
 		}
 		parts := strings.SplitN(h, " ", 2)
 		if len(parts) != 2 || !strings.EqualFold(parts[0], "Bearer") {
-			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "malformed authorization header"})
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"success": false, "error": fiber.Map{"code": "UNAUTHORIZED", "message": "malformed authorization header"}})
 		}
 		sub, err := auth.ValidateToken(parts[1])
 		if err != nil {
-			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "invalid or expired token"})
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"success": false, "error": fiber.Map{"code": "UNAUTHORIZED", "message": "invalid or expired token"}})
 		}
 		c.Locals("userId", sub)
 		return c.Next()

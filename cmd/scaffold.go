@@ -6,13 +6,16 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/v-pat/fiberforge/examples"
+
 	"github.com/v-pat/fiberforge/internal/engine"
 	"github.com/v-pat/fiberforge/internal/schema"
 )
 
 var (
-	outputDir string
-	dryRun    bool
+	outputDir    string
+	dryRun       bool
+	templateName string
 )
 
 var scaffoldCmd = &cobra.Command{
@@ -21,11 +24,27 @@ var scaffoldCmd = &cobra.Command{
 	Long: `scaffold reads a YAML or JSON schema describing your project and
 generates a complete, production-ready Go Fiber application on disk.
 No AI required — the schema drives deterministic code generation.`,
-	Args: cobra.ExactArgs(1),
+	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		cfg, err := schema.Load(args[0])
-		if err != nil {
-			return err
+		var cfg *schema.Config
+		var err error
+
+		if templateName != "" {
+			content, err := examples.Get(templateName)
+			if err != nil {
+				return fmt.Errorf("failed to load template: %w", err)
+			}
+			cfg, err = schema.Parse(content)
+			if err != nil {
+				return fmt.Errorf("failed to parse template: %w", err)
+			}
+		} else if len(args) == 1 {
+			cfg, err = schema.Load(args[0])
+			if err != nil {
+				return err
+			}
+		} else {
+			return fmt.Errorf("must provide either a schema file or a --template flag")
 		}
 		if outputDir != "" {
 			cfg.OutputDir = outputDir
@@ -50,5 +69,7 @@ No AI required — the schema drives deterministic code generation.`,
 func init() {
 	scaffoldCmd.Flags().StringVar(&outputDir, "output-dir", "", "override the output directory")
 	scaffoldCmd.Flags().BoolVar(&dryRun, "dry-run", false, "preview generated files without writing to disk")
+	scaffoldCmd.Flags().StringVarP(&templateName, "template", "t", "", "scaffold from a pre-built template (e.g. blog, ecommerce, saas, social)")
+
 	rootCmd.AddCommand(scaffoldCmd)
 }

@@ -215,6 +215,17 @@ func (e *Engine) genControllers() error {
 			return err
 		}
 	}
+
+	utilsContent, err := e.render("controller_utils", controllerUtilsTemplate, map[string]any{
+		"AppName": e.AppModule(),
+	})
+	if err != nil {
+		return err
+	}
+	if err := e.write(filepath.Join("controller", "utils.go"), prefix+utilsContent); err != nil {
+		return err
+	}
+
 	return nil
 }
 

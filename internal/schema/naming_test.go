@@ -4,13 +4,13 @@ import "testing"
 
 func TestPascal(t *testing.T) {
 	cases := map[string]string{
-		"user":          "User",
-		"blog_post":     "BlogPost",
-		"kebab-case":    "KebabCase",
-		"space name":    "SpaceName",
-		"":              "",
-		"alreadyUpper":  "AlreadyUpper",
-		"__double__":    "Double",
+		"user":              "User",
+		"blog_post":         "BlogPost",
+		"kebab-case":        "KebabCase",
+		"space name":        "SpaceName",
+		"":                  "",
+		"alreadyUpper":      "AlreadyUpper",
+		"__double__":        "Double",
 		"mixed_snake-Kebab": "MixedSnakeKebab",
 	}
 	for in, want := range cases {
@@ -22,11 +22,11 @@ func TestPascal(t *testing.T) {
 
 func TestCamel(t *testing.T) {
 	cases := map[string]string{
-		"user":        "user",
-		"blog_post":   "blogPost",
-		"BlogPost":    "blogPost",
-		"":            "",
-		"a":           "a",
+		"user":      "user",
+		"blog_post": "blogPost",
+		"BlogPost":  "blogPost",
+		"":          "",
+		"a":         "a",
 	}
 	for in, want := range cases {
 		if got := Camel(in); got != want {
@@ -37,9 +37,9 @@ func TestCamel(t *testing.T) {
 
 func TestLower(t *testing.T) {
 	cases := map[string]string{
-		"User":   "user",
+		"User":     "user",
 		"  Blog  ": "blog",
-		"ABC":    "abc",
+		"ABC":      "abc",
 	}
 	for in, want := range cases {
 		if got := Lower(in); got != want {

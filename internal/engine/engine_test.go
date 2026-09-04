@@ -27,10 +27,10 @@ func fullConfig() *schema.Config {
 		},
 		Models: []schema.Model{
 			{
-				Name:     "Post",
-				Endpoint: "posts",
+				Name:          "Post",
+				Endpoint:      "posts",
 				AuthProtected: true,
-				TableName: "blog_posts",
+				TableName:     "blog_posts",
 				Fields: []schema.Field{
 					{Name: "Title", Type: schema.TypeString, Required: true, OmitEmpty: true},
 					{Name: "Body", Type: schema.TypeText, OmitEmpty: true},
