@@ -1,6 +1,5 @@
 # FiberForge ⚡
 
-[![Smithery MCP](https://smithery.ai/badge/fiberforge)](https://smithery.ai/server/fiberforge)
 
 **FiberForge** (`fiberforge`) is a high-performance Go CLI and MCP server that generates complete, production-grade **Go Fiber (v2)** REST API backends from a declarative YAML or JSON schema.
 
@@ -34,7 +33,7 @@ Give it a schema describing your domain entities and features, and FiberForge sc
 ### Via NPM / NPX (Recommended for quick start)
 You don't even need Go installed to use FiberForge. Just run it via `npx`:
 ```bash
-npx fiberfiberforge init
+npx fiberforge-cli init
 ```
 
 ### Via Go
@@ -104,12 +103,6 @@ Add FiberForge to your editor's MCP config:
 ```
 
 *(If you installed via Go, you can use `"command": "fiberforge", "args": ["serve"]` instead)*
-
-**Using Smithery**
-To install FiberForge for Claude Desktop automatically via [Smithery](https://smithery.ai/server/fiberforge):
-```bash
-npx @smithery/cli install fiberforge --client claude
-```
 
 #### Exposed MCP Tools
 

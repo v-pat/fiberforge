@@ -1,4 +1,4 @@
-# fiberforge
+# fiberforge-cli
 
 The official NPM wrapper for [FiberForge](https://github.com/v-pat/fiberforge), a deterministic, schema-driven Go Fiber project scaffolder with an embedded MCP server.
 
@@ -15,18 +15,16 @@ npx fiberforge-cli scaffold examples/blog.yaml
 To create a new project interactively:
 
 ```bash
-npx fiberfiberforge init
+npx fiberforge-cli init
 ```
 
 ## Global Installation
 
 ```bash
-npm install -g fiberforge
+npm install -g fiberforge-cli
 
 # Now you can use it anywhere
 fiberforge init
-# OR
-fiberfiberforge init
 ```
 
 ## Features
