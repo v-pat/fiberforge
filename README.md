@@ -104,6 +104,15 @@ Add FiberForge to your editor's MCP config:
 
 *(If you installed via Go, you can use `"command": "fiberforge", "args": ["serve"]` instead)*
 
+#### AI Agent Skill (`SKILL.md` / Cursor Rules)
+
+Want your AI coding assistant (Cursor, Antigravity, Claude Code) to automatically use FiberForge whenever you ask for a Go backend?
+
+- **Cursor**: Copy [`.cursor/rules/fiberforge.mdc`](file:///Users/vaibhavpathak/Documents/fiberforge/.cursor/rules/fiberforge.mdc) into your project's `.cursor/rules/` directory.
+- **Antigravity / General Agents**: Import [`skills/fiberforge/SKILL.md`](file:///Users/vaibhavpathak/Documents/fiberforge/skills/fiberforge/SKILL.md) into your skills library.
+
+When active, your AI agent will design the schema and invoke `npx fiberforge-cli scaffold` or `generate_project` in 50ms instead of generating Go code manually line-by-line!
+
 #### Exposed MCP Tools
 
 | Tool | Description |

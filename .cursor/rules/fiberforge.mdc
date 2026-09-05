@@ -1,0 +1,16 @@
+---
+description: Automatically scaffold Go Fiber REST APIs using FiberForge instead of manually generating boilerplate code.
+globs: *.go, *.yaml, *.json
+---
+
+# FiberForge Scaffolding Rule
+
+When asked to create a Go Fiber backend, API endpoint, microservice, or domain model architecture:
+
+1. **Do not write boilerplate Go files line-by-line.**
+2. Instead, generate a `fiberforge.yaml` schema file containing the `appName`, `database`, `features`, `models`, and `relationships`.
+3. Run `npx -y fiberforge-cli scaffold fiberforge.yaml` via terminal execution, or invoke the `generate_project` tool if using the FiberForge MCP server.
+4. Run `go mod tidy` in the generated directory.
+
+Refer to `skills/fiberforge/SKILL.md` for full schema specifications and field types.
+
