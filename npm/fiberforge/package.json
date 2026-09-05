@@ -1,9 +1,10 @@
 {
   "name": "fiberforge-cli",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "description": "Deterministic, schema-driven Go Fiber project scaffolder with an embedded MCP server",
   "main": "run.js",
   "bin": {
+    "fiberforge-cli": "run.js",
     "fiberforge": "run.js"
   },
   "scripts": {
