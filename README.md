@@ -7,6 +7,8 @@ Give it a schema describing your domain entities and features, and FiberForge sc
 
 > **Design Principle**: *AI agents write the schema; FiberForge renders deterministic, 100% compilable, production-ready Go code in 50 milliseconds.*
 
+![FiberForge CLI Demo](.github/assets/cli-demo.gif)
+
 ---
 
 ## Features
@@ -79,7 +81,7 @@ fiberforge scaffold examples/blog.yaml --dry-run
 
 ### 3. AI Agent MCP Server (`fiberforge serve`)
 
-Run FiberForge as a Model Context Protocol (MCP) server over stdio for AI coding agents (**Claude Code**, **Cursor**, **Cline**, **Windsurf**):
+Run FiberForge as a Model Context Protocol (MCP) server over stdio for AI coding agents (**Claude Code**, **Cursor**, **Cline**, **Windsurf**, **opencode**):
 
 ```bash
 fiberforge serve
@@ -103,6 +105,19 @@ Add FiberForge to your editor's MCP config:
 ```
 
 *(If you installed via Go, you can use `"command": "fiberforge", "args": ["serve"]` instead)*
+
+**opencode (`.opencode.json`)**:
+
+```json
+{
+  "mcp": {
+    "fiberforge": {
+      "type": "local",
+      "command": ["npx", "-y", "fiberforge-cli", "serve"]
+    }
+  }
+}
+```
 
 #### AI Agent Skill (`SKILL.md` / Cursor Rules)
 

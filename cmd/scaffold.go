@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 
@@ -16,6 +17,7 @@ var (
 	outputDir    string
 	dryRun       bool
 	templateName string
+	jsonOutput   bool
 )
 
 var scaffoldCmd = &cobra.Command{
@@ -51,6 +53,14 @@ No AI required — the schema drives deterministic code generation.`,
 		}
 		eng := engine.New(cfg)
 		if dryRun {
+			if jsonOutput {
+				return printJSON(map[string]any{
+					"dryRun":   true,
+					"appName":  cfg.AppName,
+					"database": cfg.Database,
+					"files":    eng.Files(),
+				})
+			}
 			fmt.Printf("Dry run for %s (Output: %s):\n", cfg.AppName, eng.Dir())
 			for _, f := range eng.Files() {
 				fmt.Printf("  - %s\n", f)
@@ -61,15 +71,31 @@ No AI required — the schema drives deterministic code generation.`,
 		if err != nil {
 			return fmt.Errorf("scaffold failed: %w", err)
 		}
+		if jsonOutput {
+			return printJSON(map[string]any{
+				"success":   true,
+				"outputDir": dir,
+				"appName":   cfg.AppName,
+				"database":  cfg.Database,
+				"files":     eng.Files(),
+			})
+		}
 		fmt.Fprintf(os.Stderr, "✓ project generated in %s\n", dir)
 		return nil
 	},
+}
+
+func printJSON(v any) error {
+	enc := json.NewEncoder(os.Stdout)
+	enc.SetIndent("", "  ")
+	return enc.Encode(v)
 }
 
 func init() {
 	scaffoldCmd.Flags().StringVar(&outputDir, "output-dir", "", "override the output directory")
 	scaffoldCmd.Flags().BoolVar(&dryRun, "dry-run", false, "preview generated files without writing to disk")
 	scaffoldCmd.Flags().StringVarP(&templateName, "template", "t", "", "scaffold from a pre-built template (e.g. blog, ecommerce, saas, social)")
+	scaffoldCmd.Flags().BoolVar(&jsonOutput, "json", false, "output results as JSON (for agent/script consumption)")
 
 	rootCmd.AddCommand(scaffoldCmd)
 }

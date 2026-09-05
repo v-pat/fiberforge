@@ -1,0 +1,28 @@
+appName: store-api
+framework: fiber
+database: postgres
+port: 8080
+features:
+    auth: true
+    docker: true
+    migrations: true
+    swagger: true
+    rateLimit: false
+    cors: false
+    logging: false
+    testing: false
+    ci: false
+models:
+    - name: Product
+      endpoint: products
+      fields:
+        - name: Title
+          type: string
+          required: true
+          unique: false
+          sensitive: false
+          index: false
+          omitempty: false
+      auth: false
+outputDir: ""
+env: {}

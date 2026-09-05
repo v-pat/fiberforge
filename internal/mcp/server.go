@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/v-pat/fiberforge/examples"
@@ -20,13 +22,17 @@ import (
 // (which already has model access) calls the tools; the engine keeps code
 // generation deterministic.
 type Server struct {
-	in  io.Reader
-	out io.Writer
+	in      io.Reader
+	out     io.Writer
+	Version string
 }
 
 // NewServer creates an MCP server reading from in and writing to out.
-func NewServer(in io.Reader, out io.Writer) *Server {
-	return &Server{in: in, out: out}
+func NewServer(in io.Reader, out io.Writer, version string) *Server {
+	if version == "" {
+		version = "dev"
+	}
+	return &Server{in: in, out: out, Version: version}
 }
 
 type rpcRequest struct {
@@ -76,9 +82,10 @@ func (s *Server) dispatch(req rpcRequest) {
 		result = map[string]any{
 			"protocolVersion": "2024-11-05",
 			"capabilities": map[string]any{
-				"tools": map[string]any{},
+				"tools":     map[string]any{},
+				"resources": map[string]any{},
 			},
-			"serverInfo": map[string]any{"name": "fiberforge", "version": "1.0.0"},
+			"serverInfo": map[string]any{"name": "fiberforge", "version": s.Version},
 		}
 	case "notifications/initialized", "notifications/cancelled":
 		// Fire and forget; no reply.
@@ -90,7 +97,9 @@ func (s *Server) dispatch(req rpcRequest) {
 	case "tools/call":
 		result, rerr = s.callTool(req.Params)
 	case "resources/list", "tools/resources/list":
-		result = map[string]any{"resources": []any{}}
+		result = map[string]any{"resources": listResources()}
+	case "resources/read":
+		result, rerr = s.readResource(req.Params)
 	default:
 		rerr = &rpcError{Code: -32601, Message: "method not found: " + req.Method}
 	}
@@ -163,6 +172,29 @@ func (s *Server) generateProject(args json.RawMessage) (any, *rpcError) {
 		cfg.OutputDir = input.Output
 	}
 
+	// Workspace root guard: ensure output directory stays within CWD.
+	if cfg.OutputDir != "" {
+		absOut, err := filepath.Abs(cfg.OutputDir)
+		if err != nil {
+			return nil, &rpcError{Code: -32602, Message: "invalid outputDir: " + err.Error()}
+		}
+		cwd, err := os.Getwd()
+		if err != nil {
+			return nil, &rpcError{Code: -32603, Message: "cannot determine working directory: " + err.Error()}
+		}
+		if !strings.HasPrefix(absOut, cwd+string(filepath.Separator)) && absOut != cwd {
+			return map[string]any{
+				"content": []any{
+					map[string]any{
+						"type": "text",
+						"text": fmt.Sprintf("outputDir %q resolves to %q which is outside the workspace root %q. Generation refused for safety.", cfg.OutputDir, absOut, cwd),
+					},
+				},
+				"isError": true,
+			}, nil
+		}
+	}
+
 	eng := engine.New(cfg)
 	dir, err := eng.Generate()
 	if err != nil {
@@ -177,11 +209,21 @@ func (s *Server) generateProject(args json.RawMessage) (any, *rpcError) {
 		}, nil
 	}
 
+	// Collect endpoints for structured output.
+	var endpoints []string
+	for _, m := range cfg.Models {
+		endpoints = append(endpoints, "/api/"+m.Endpoint)
+	}
+	if cfg.Features.Auth {
+		endpoints = append(endpoints, "/api/auth/register", "/api/auth/login", "/api/auth/me", "/api/auth/refresh")
+	}
+	endpoints = append(endpoints, "/health/live", "/health/ready")
+
 	return map[string]any{
 		"content": []any{
 			map[string]any{
 				"type": "text",
-				"text": fmt.Sprintf("Project generated successfully at %s. Set %s in your environment to use it, then run `go run .`.", dir, cfg.AppName),
+				"text": fmt.Sprintf("Project generated successfully at %s. Run: cd %s && go mod tidy && go run .", dir, dir),
 			},
 		},
 		"outputDir":    dir,
@@ -189,6 +231,13 @@ func (s *Server) generateProject(args json.RawMessage) (any, *rpcError) {
 		"database":     cfg.Database,
 		"modelCount":   len(cfg.Models),
 		"featureCount": featureCount(cfg),
+		"files":        eng.Files(),
+		"endpoints":    endpoints,
+		"nextSteps": []string{
+			fmt.Sprintf("cd %s && go mod tidy", dir),
+			"go test ./...",
+			"go run .",
+		},
 	}, nil
 }
 
@@ -367,4 +416,96 @@ func (s *Server) write(resp rpcResponse) {
 		return
 	}
 	_, _ = s.out.Write(append(data, '\n'))
+}
+
+// --- MCP Resources ---
+
+type resource struct {
+	URI         string `json:"uri"`
+	Name        string `json:"name"`
+	Description string `json:"description,omitempty"`
+	MimeType    string `json:"mimeType,omitempty"`
+}
+
+func listResources() []resource {
+	return []resource{
+		{
+			URI:         "fiberforge://templates/blog",
+			Name:        "Blog Template",
+			Description: "Pre-built schema for a blog with posts, tags, and JWT auth (PostgreSQL).",
+			MimeType:    "text/yaml",
+		},
+		{
+			URI:         "fiberforge://templates/ecommerce",
+			Name:        "E-Commerce Template",
+			Description: "Pre-built schema for products, categories, orders, and payments (PostgreSQL).",
+			MimeType:    "text/yaml",
+		},
+		{
+			URI:         "fiberforge://templates/saas",
+			Name:        "SaaS Template",
+			Description: "Pre-built schema for multi-tenant SaaS with organizations and subscriptions (PostgreSQL).",
+			MimeType:    "text/yaml",
+		},
+		{
+			URI:         "fiberforge://templates/social",
+			Name:        "Social Template",
+			Description: "Pre-built schema for a social feed with posts and comments (MongoDB).",
+			MimeType:    "text/yaml",
+		},
+		{
+			URI:         "fiberforge://reference/field-types",
+			Name:        "Field Types Reference",
+			Description: "All supported field types, field options, database drivers, and relationship kinds.",
+			MimeType:    "text/plain",
+		},
+	}
+}
+
+func (s *Server) readResource(params json.RawMessage) (any, *rpcError) {
+	var p struct {
+		URI string `json:"uri"`
+	}
+	if err := json.Unmarshal(params, &p); err != nil {
+		return nil, &rpcError{Code: -32602, Message: "invalid params: " + err.Error()}
+	}
+
+	switch p.URI {
+	case "fiberforge://templates/blog",
+		"fiberforge://templates/ecommerce",
+		"fiberforge://templates/saas",
+		"fiberforge://templates/social":
+		// Extract template name from URI.
+		name := p.URI[len("fiberforge://templates/"):]
+		content, err := examples.Get(name)
+		if err != nil {
+			return nil, &rpcError{Code: -32602, Message: "unknown template: " + name}
+		}
+		return map[string]any{
+			"contents": []any{
+				map[string]any{
+					"uri":      p.URI,
+					"mimeType": "text/yaml",
+					"text":     string(content),
+				},
+			},
+		}, nil
+
+	case "fiberforge://reference/field-types":
+		// Reuse the same info text from listFieldTypes.
+		result, _ := s.listFieldTypes()
+		info := result.(map[string]any)["content"].([]any)[0].(map[string]any)["text"].(string)
+		return map[string]any{
+			"contents": []any{
+				map[string]any{
+					"uri":      p.URI,
+					"mimeType": "text/plain",
+					"text":     info,
+				},
+			},
+		}, nil
+
+	default:
+		return nil, &rpcError{Code: -32602, Message: "unknown resource URI: " + p.URI}
+	}
 }

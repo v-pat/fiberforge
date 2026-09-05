@@ -8,6 +8,8 @@ builds:
   - id: fiberforge
     binary: fiberforge
     main: .
+    ldflags:
+      - -s -w -X github.com/v-pat/fiberforge/cmd.Version={{.Version}}
     env:
       - CGO_ENABLED=0
     goos:

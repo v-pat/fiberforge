@@ -1,0 +1,71 @@
+name: CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  test:
+    name: Test and Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+          cache: true
+
+      - name: Run go vet
+        run: go vet ./...
+
+      - name: Run tests
+        run: go test -race -v ./...
+
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: latest
+          args: --timeout=5m
+
+  scaffold-matrix:
+    name: Test Scaffold (${{ matrix.template }}, ${{ matrix.database }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        template: [blog, ecommerce, saas, social]
+        database: [postgres, mysql, mongodb]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+          cache: true
+
+      - name: Build fiberforge
+        run: go build -o ./fiberforge-bin .
+
+      - name: Generate and build project
+        run: |
+          mkdir -p /tmp/fiberforge-test
+          cp examples/${{ matrix.template }}.yaml /tmp/fiberforge-test/schema.yaml
+          
+          # Replace database field
+          sed -i 's/^[[:space:]]*database:.*/database: ${{ matrix.database }}/g' /tmp/fiberforge-test/schema.yaml
+          
+          # Scaffold the project
+          ./fiberforge-bin scaffold /tmp/fiberforge-test/schema.yaml --output-dir ./generated-project
+          
+          # Verify it compiles
+          cd ./generated-project
+          go mod tidy
+          go build ./...
+

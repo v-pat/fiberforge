@@ -15,7 +15,7 @@ func TestMCPServerHandshake(t *testing.T) {
 {"jsonrpc":"2.0","id":3,"method":"ping","params":{}}
 `)
 	var out bytes.Buffer
-	srv := mcp.NewServer(in, &out)
+	srv := mcp.NewServer(in, &out, "test")
 
 	if err := srv.Serve(); err != nil {
 		t.Fatalf("Serve failed: %v", err)
@@ -44,7 +44,7 @@ func TestMCPServerHandshake(t *testing.T) {
 func TestMCPGetSchemaTemplate(t *testing.T) {
 	in := strings.NewReader(`{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"get_schema_template","arguments":{"name":"blog"}}}`)
 	var out bytes.Buffer
-	srv := mcp.NewServer(in, &out)
+	srv := mcp.NewServer(in, &out, "test")
 
 	if err := srv.Serve(); err != nil {
 		t.Fatalf("Serve failed: %v", err)
@@ -71,7 +71,7 @@ func TestMCPGetSchemaTemplate(t *testing.T) {
 func TestMCPListFieldTypes(t *testing.T) {
 	in := strings.NewReader(`{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"list_field_types","arguments":{}}}`)
 	var out bytes.Buffer
-	srv := mcp.NewServer(in, &out)
+	srv := mcp.NewServer(in, &out, "test")
 
 	if err := srv.Serve(); err != nil {
 		t.Fatalf("Serve failed: %v", err)
@@ -109,7 +109,7 @@ func TestMCPExplainProject(t *testing.T) {
 
 	in := strings.NewReader(string(reqData) + "\n")
 	var out bytes.Buffer
-	srv := mcp.NewServer(in, &out)
+	srv := mcp.NewServer(in, &out, "test")
 
 	if err := srv.Serve(); err != nil {
 		t.Fatalf("Serve failed: %v", err)
