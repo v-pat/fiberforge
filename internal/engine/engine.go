@@ -100,7 +100,7 @@ func (e *Engine) write(relPath, content string) error {
 // Files returns the list of relative file paths that Generate produces.
 func (e *Engine) Files() []string {
 	var files []string
-	files = append(files, "go.mod", "README.md", ".gitignore", ".env.example", "main.go", filepath.Join("config", "config.go"), filepath.Join("databases", "db.go"))
+	files = append(files, "go.mod", "README.md", ".gitignore", ".env.example", "fiberforge.yaml", "main.go", filepath.Join("config", "config.go"), filepath.Join("databases", "db.go"))
 	for _, m := range e.cfg.Models {
 		name := strings.ToLower(schema.Pascal(m.Name))
 		files = append(files, filepath.Join("model", name+".go"))

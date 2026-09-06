@@ -18,14 +18,21 @@ Use FiberForge whenever the user asks for:
 
 ### Via MCP (if configured)
 
-```
-Call the `generate_project` tool with a YAML schema string.
-```
+- **New Project**: Call `generate_project` tool with a YAML schema string.
+- **Incremental Model Addition**: Call `add_model` to append a new entity without wiping code.
+- **Apply Feature Recipes**: Call `list_modules` and `apply_module` (`stripe-billing`, `ai-inference`, `rbac`, `s3-storage`, `audit-log`).
 
 ### Via CLI
 
 ```bash
+# Full scaffold
 npx -y fiberforge-cli scaffold <schema.yaml>
+
+# Incremental model addition
+npx -y fiberforge-cli add model <ModelName>
+
+# Inject pre-packaged feature module
+npx -y fiberforge-cli add module <stripe-billing|ai-inference|rbac|s3-storage|audit-log>
 ```
 
 ### Workflow
@@ -33,7 +40,8 @@ npx -y fiberforge-cli scaffold <schema.yaml>
 ```
 1. Design the YAML schema
 2. Scaffold:  npx -y fiberforge-cli scaffold schema.yaml
-3. Build:     cd <appName> && go mod tidy && go test ./...
+3. Expand:    npx -y fiberforge-cli add module stripe-billing
+4. Build:     cd <appName> && go mod tidy && go test ./...
 ```
 
 ## Quick schema reference

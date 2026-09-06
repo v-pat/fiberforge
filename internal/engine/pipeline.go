@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"gopkg.in/yaml.v3"
+
 	"github.com/v-pat/fiberforge/internal/schema"
 )
 
@@ -111,7 +113,16 @@ func (e *Engine) genProjectMeta() error {
 	if err != nil {
 		return err
 	}
-	return e.write(".env.example", env)
+	if err := e.write(".env.example", env); err != nil {
+		return err
+	}
+
+	// Write fiberforge.yaml into generated project root
+	yamlData, err := yaml.Marshal(e.cfg)
+	if err == nil {
+		_ = e.write("fiberforge.yaml", string(yamlData))
+	}
+	return nil
 }
 
 // genModels writes one model file per configured model.

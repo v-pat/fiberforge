@@ -9,9 +9,12 @@ import (
 	"path/filepath"
 	"strings"
 
+	"gopkg.in/yaml.v3"
+
 	"github.com/v-pat/fiberforge/examples"
 
 	"github.com/v-pat/fiberforge/internal/engine"
+	"github.com/v-pat/fiberforge/internal/modules"
 	"github.com/v-pat/fiberforge/internal/schema"
 )
 
@@ -128,6 +131,12 @@ func (s *Server) callTool(params json.RawMessage) (any, *rpcError) {
 		return s.listFieldTypes()
 	case "explain_project":
 		return s.explainProject(p.Arguments)
+	case "add_model":
+		return s.addModel(p.Arguments)
+	case "list_modules":
+		return s.listModules()
+	case "apply_module":
+		return s.applyModule(p.Arguments)
 	default:
 		return nil, &rpcError{Code: -32601, Message: "unknown tool: " + p.Name}
 	}
@@ -396,6 +405,132 @@ func (s *Server) explainProject(args json.RawMessage) (any, *rpcError) {
 		"appName":    cfg.AppName,
 		"database":   cfg.Database,
 		"modelCount": len(cfg.Models),
+	}, nil
+}
+
+func (s *Server) addModel(args json.RawMessage) (any, *rpcError) {
+	var input struct {
+		TargetDir string `json:"targetDir"`
+		Model     string `json:"model"`
+		DryRun    bool   `json:"dryRun"`
+	}
+	if err := json.Unmarshal(args, &input); err != nil {
+		return nil, &rpcError{Code: -32602, Message: "invalid arguments: " + err.Error()}
+	}
+	if input.Model == "" {
+		return nil, &rpcError{Code: -32602, Message: "argument 'model' is required (YAML or JSON string)"}
+	}
+	targetDir := input.TargetDir
+	if targetDir == "" {
+		targetDir = "."
+	}
+
+	var m schema.Model
+	if err := yaml.Unmarshal([]byte(input.Model), &m); err != nil {
+		return nil, &rpcError{Code: -32602, Message: "invalid model syntax: " + err.Error()}
+	}
+	if m.Name == "" {
+		return nil, &rpcError{Code: -32602, Message: "model 'name' is required"}
+	}
+
+	files, err := engine.AddModelWithOptions(targetDir, m, input.DryRun)
+	if err != nil {
+		return map[string]any{
+			"content": []any{
+				map[string]any{
+					"type": "text",
+					"text": "Failed to add model: " + err.Error(),
+				},
+			},
+			"isError": true,
+		}, nil
+	}
+
+	textMsg := fmt.Sprintf("Model %q successfully added to %s. Model struct, CRUD service, Fiber controller, DB migration, and route registration were updated.", m.Name, targetDir)
+	if input.DryRun {
+		textMsg = fmt.Sprintf("Dry-run preview for adding model %q to %s:\nFiles to be generated:\n  - %s", m.Name, targetDir, strings.Join(files, "\n  - "))
+	}
+
+	return map[string]any{
+		"content": []any{
+			map[string]any{
+				"type": "text",
+				"text": textMsg,
+			},
+		},
+		"modelName": m.Name,
+		"targetDir": targetDir,
+		"dryRun":    input.DryRun,
+		"files":     files,
+	}, nil
+}
+
+func (s *Server) listModules() (any, *rpcError) {
+	mods := modules.List()
+	sb := strings.Builder{}
+	sb.WriteString("Available Feature Modules:\n")
+	for _, m := range mods {
+		sb.WriteString(fmt.Sprintf("- %s (%s): %s [%d model(s)]\n", m.Name, m.Category, m.Description, len(m.Models)))
+	}
+
+	return map[string]any{
+		"content": []any{
+			map[string]any{
+				"type": "text",
+				"text": sb.String(),
+			},
+		},
+		"modules": mods,
+	}, nil
+}
+
+func (s *Server) applyModule(args json.RawMessage) (any, *rpcError) {
+	var input struct {
+		TargetDir string `json:"targetDir"`
+		Module    string `json:"module"`
+		DryRun    bool   `json:"dryRun"`
+	}
+	if err := json.Unmarshal(args, &input); err != nil {
+		return nil, &rpcError{Code: -32602, Message: "invalid arguments: " + err.Error()}
+	}
+	if input.Module == "" {
+		return nil, &rpcError{Code: -32602, Message: "argument 'module' is required"}
+	}
+	targetDir := input.TargetDir
+	if targetDir == "" {
+		targetDir = "."
+	}
+
+	added, files, err := modules.ApplyWithOptions(targetDir, input.Module, input.DryRun)
+	if err != nil {
+		return map[string]any{
+			"content": []any{
+				map[string]any{
+					"type": "text",
+					"text": "Failed to apply module: " + err.Error(),
+				},
+			},
+			"isError": true,
+		}, nil
+	}
+
+	textMsg := fmt.Sprintf("Module %q successfully applied to %s. Added models: %s", input.Module, targetDir, strings.Join(added, ", "))
+	if input.DryRun {
+		textMsg = fmt.Sprintf("Dry-run preview for applying module %q to %s:\nModels to be added: %s\nFiles to be generated:\n  - %s", input.Module, targetDir, strings.Join(added, ", "), strings.Join(files, "\n  - "))
+	}
+
+	return map[string]any{
+		"content": []any{
+			map[string]any{
+				"type": "text",
+				"text": textMsg,
+			},
+		},
+		"module":      input.Module,
+		"addedModels": added,
+		"targetDir":   targetDir,
+		"dryRun":      input.DryRun,
+		"files":       files,
 	}, nil
 }
 

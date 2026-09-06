@@ -94,6 +94,58 @@ func listTools() []tool {
 				Required: []string{"schema"},
 			},
 		},
+		{
+			Name:        "add_model",
+			Description: "Incrementally add a new entity model to an existing Go Fiber backend project without wiping out manual code. Appends model struct, CRUD service, Fiber controller, database migration, and safely updates routes/routes.go via Go AST. Pass dryRun: true to preview affected files without writing.",
+			InputSchema: toolSchema{
+				Type: "object",
+				Properties: map[string]propertySpec{
+					"targetDir": {
+						Type:        "string",
+						Description: "Target project directory containing fiberforge.yaml. Defaults to '.'",
+					},
+					"model": {
+						Type:        "string",
+						Description: "Model definition in YAML or JSON (with name, endpoint, fields, relationships).",
+					},
+					"dryRun": {
+						Type:        "boolean",
+						Description: "If true, returns the file creation list and AST route diffs without modifying files on disk.",
+					},
+				},
+				Required: []string{"model"},
+			},
+		},
+		{
+			Name:        "list_modules",
+			Description: "List pre-packaged domain feature modules ('stripe-billing', 'ai-inference', 'rbac', 's3-storage', 'audit-log', etc.) that can be injected into any project.",
+			InputSchema: toolSchema{
+				Type:       "object",
+				Properties: map[string]propertySpec{},
+			},
+		},
+		{
+			Name:        "apply_module",
+			Description: "Inject a pre-packaged domain feature module recipe ('stripe-billing', 'ai-inference', 'rbac', 's3-storage', 'audit-log', etc.) into an existing project. Pass dryRun: true to preview affected files without writing.",
+			InputSchema: toolSchema{
+				Type: "object",
+				Properties: map[string]propertySpec{
+					"targetDir": {
+						Type:        "string",
+						Description: "Target project directory containing fiberforge.yaml. Defaults to '.'",
+					},
+					"module": {
+						Type:        "string",
+						Description: "Module name: e.g. 'stripe-billing', 'ai-inference', 'rbac', 's3-storage', 'audit-log'.",
+					},
+					"dryRun": {
+						Type:        "boolean",
+						Description: "If true, returns the file creation list and AST route diffs without modifying files on disk.",
+					},
+				},
+				Required: []string{"module"},
+			},
+		},
 	}
 }
 
