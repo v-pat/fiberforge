@@ -56,7 +56,7 @@ func TestMCPGetSchemaTemplate(t *testing.T) {
 			Schema   string `json:"schema"`
 		} `json:"result"`
 	}
-	if err := json.Unmarshal([]byte(out.String()), &resp); err != nil {
+	if err := json.Unmarshal(out.Bytes(), &resp); err != nil {
 		t.Fatalf("unmarshal response: %v", err)
 	}
 
@@ -84,7 +84,7 @@ func TestMCPListFieldTypes(t *testing.T) {
 			} `json:"content"`
 		} `json:"result"`
 	}
-	if err := json.Unmarshal([]byte(out.String()), &resp); err != nil {
+	if err := json.Unmarshal(out.Bytes(), &resp); err != nil {
 		t.Fatalf("unmarshal response: %v", err)
 	}
 
@@ -121,7 +121,7 @@ func TestMCPExplainProject(t *testing.T) {
 			Files   []string `json:"files"`
 		} `json:"result"`
 	}
-	if err := json.Unmarshal([]byte(out.String()), &resp); err != nil {
+	if err := json.Unmarshal(out.Bytes(), &resp); err != nil {
 		t.Fatalf("unmarshal response: %v", err)
 	}
 
