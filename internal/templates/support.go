@@ -4,7 +4,7 @@ package templates
 const DockerfileTemplate = `# ---- Build stage ----
 FROM golang:1.23-alpine AS build
 WORKDIR /src
-COPY go.mod go.sum ./
+COPY go.mod ./
 RUN go mod download
 COPY . .
 RUN CGO_ENABLED=0 go build -o /bin/{{.AppName}} .
@@ -34,7 +34,8 @@ services:
       DB_NAME: {{.AppName}}
       PORT: "{{.Port}}"
       {{if .Auth}}JWT_SECRET: change-me-in-production
-      {{end}}depends_on:
+      {{end}}
+    depends_on:
       db:
         condition: service_healthy
 {{if eq .DbType "postgres"}}

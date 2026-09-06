@@ -1,11 +1,15 @@
 # FiberForge ⚡
 
+> [!WARNING]
+> **DEVELOPMENT PHASE ONLY - NOT SAFE FOR PRODUCTION**
+> 
+> FiberForge is currently in early active development. **Do not use this package on any existing project or computer you care about.** While critical bugs (like destructive directory wiping) have been patched, the tool is highly experimental and may still behave unpredictably. It is meant for initial boilerplate generation in isolated sandbox environments. We are actively looking for contributors and code reviews to improve stability. Use at your own risk!
 
-**FiberForge** (`fiberforge`) is a high-performance Go CLI and MCP server that generates complete, production-grade **Go Fiber (v2)** REST API backends from a declarative YAML or JSON schema.
+**FiberForge** (`fiberforge`) is a high-performance Go CLI and MCP server that generates complete **Go Fiber (v2)** REST API backends from a declarative YAML or JSON schema.
 
 Give it a schema describing your domain entities and features, and FiberForge scaffolds clean, deterministic code: GORM/MGM database models, business logic services, Fiber controllers, JWT authentication, versioned SQL migrations, Swagger docs, Docker containerization, structured `log/slog` logging, graceful shutdown, health probes, and unit tests.
 
-> **Design Principle**: *AI agents write the schema; FiberForge renders deterministic, 100% compilable, production-ready Go code in 50 milliseconds.*
+> **Design Principle**: *AI agents write the schema; FiberForge renders deterministic, 100% compilable Go code in 50 milliseconds.*
 
 ![FiberForge CLI Demo](.github/assets/cli-demo.gif)
 

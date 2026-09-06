@@ -25,6 +25,7 @@ package auth
 
 import (
 	"errors"
+	"log"
 	"os"
 	"time"
 
@@ -42,7 +43,8 @@ func Secret() []byte {
 	if s := os.Getenv("JWT_SECRET"); s != "" {
 		return []byte(s)
 	}
-	return []byte("change-me-in-production")
+	log.Fatal("JWT_SECRET environment variable is not set")
+	return nil
 }
 
 // GenerateToken issues a signed token for the given user id.

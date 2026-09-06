@@ -7,6 +7,8 @@ go 1.23
 
 require (
 	github.com/gofiber/fiber/v2 v2.52.4
+	github.com/go-playground/validator/v10 v10.20.0
+	github.com/google/uuid v1.6.0
 	{{if .SQL}}gorm.io/gorm v1.25.10
 	{{if .Driver}}gorm.io/driver/{{.Driver}} v1.5.6
 	{{end}}{{end}}{{if .Mongo}}github.com/kamva/mgm/v3 v3.5.0

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"regexp"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -86,21 +87,29 @@ func Validate(cfg *Config) error {
 			for _, f := range m.Fields {
 				switch {
 				case strings.EqualFold(f.Name, "email"):
-					hasEmail = true
+					if f.Type == "string" {
+						hasEmail = true
+					}
 				case strings.EqualFold(f.Name, "password"):
-					hasPassword = true
+					if f.Type == "string" || f.Type == "password" {
+						hasPassword = true
+					}
 				}
 			}
 			if !hasEmail || !hasPassword {
-				return fmt.Errorf("the user model needs email and password fields when auth is enabled")
+				return fmt.Errorf("the user model needs email (string) and password (string/password) fields when auth is enabled")
 			}
 		}
 	}
 
 	nameSeen := map[string]bool{}
+	identRe := regexp.MustCompile("^[a-zA-Z_][a-zA-Z0-9_]*$")
 	for _, m := range cfg.Models {
 		if m.Name == "" {
 			return fmt.Errorf("every model needs a name")
+		}
+		if !identRe.MatchString(m.Name) {
+			return fmt.Errorf("model name %q is not a valid identifier", m.Name)
 		}
 		if nameSeen[strings.ToLower(m.Name)] {
 			return fmt.Errorf("duplicate model name %q", m.Name)
@@ -112,6 +121,9 @@ func Validate(cfg *Config) error {
 		for _, f := range m.Fields {
 			if f.Name == "" {
 				return fmt.Errorf("model %q has a field with no name", m.Name)
+			}
+			if !identRe.MatchString(f.Name) {
+				return fmt.Errorf("model %q field %q is not a valid identifier", m.Name, f.Name)
 			}
 			if err := validateField(f); err != nil {
 				return fmt.Errorf("model %q field %q: %w", m.Name, f.Name, err)

@@ -51,11 +51,8 @@ func (e *Engine) Generate() (string, error) {
 	return e.dir, nil
 }
 
-// prepareDir removes any existing output and recreates it cleanly.
+// prepareDir creates the output directory cleanly if it doesn't exist.
 func (e *Engine) prepareDir() error {
-	if err := os.RemoveAll(e.dir); err != nil {
-		return err
-	}
 	return os.MkdirAll(e.dir, 0o755)
 }
 

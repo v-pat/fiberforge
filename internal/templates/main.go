@@ -121,8 +121,9 @@ import "os"
 // Load verifies required environment variables, applying dev defaults so
 // startup fails fast with a clear message when something is missing.
 func Load() error {
-	required := []string{"DB_HOST", "DB_PORT", "DB_USER", "DB_PASSWORD", "DB_NAME", "PORT"}
-	for _, k := range required {
+{{if eq .DbType "mongodb"}}	required := []string{"DB_URI", "DB_NAME", "PORT"}
+{{else}}	required := []string{"DB_HOST", "DB_PORT", "DB_USER", "DB_PASSWORD", "DB_NAME", "PORT"}
+{{end}}	for _, k := range required {
 		if os.Getenv(k) == "" {
 			os.Setenv(k, defaultValue(k))
 		}
@@ -142,6 +143,8 @@ func defaultValue(k string) string {
 		return "{{.DBPassword}}"
 	case "DB_NAME":
 		return "{{.AppName}}"
+	case "DB_URI":
+		return "mongodb://localhost:{{.DBPort}}"
 	case "PORT":
 		return "{{.Port}}"
 	default:

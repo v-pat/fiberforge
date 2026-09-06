@@ -182,7 +182,10 @@ func dsnFormat(driver string) string {
 
 // buildMigration generates up/down SQL for a model on a given driver.
 func buildMigration(m schema.Model, driver string) (up, down string) {
-	table := schema.Plural(m.Name)
+	table := m.TableName
+	if table == "" {
+		table = schema.Plural(m.Name)
+	}
 	var cols []string
 	for _, f := range m.Fields {
 		cols = append(cols, columnDDL(f, driver))
@@ -199,7 +202,10 @@ func buildMigration(m schema.Model, driver string) (up, down string) {
 
 	for _, r := range m.Relationships {
 		if r.Type == schema.ManyToMany {
-			selfTable := schema.Plural(m.Name)
+			selfTable := m.TableName
+			if selfTable == "" {
+				selfTable = schema.Plural(m.Name)
+			}
 			targetTable := schema.Plural(r.Model)
 			joinTable := schema.Lower(selfTable) + "_" + schema.Lower(targetTable)
 			selfFK := schema.Camel(m.Name) + "Id"
