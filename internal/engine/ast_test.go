@@ -20,9 +20,8 @@ func TestASTRouteInjection(t *testing.T) {
 		},
 	}
 
-	eng := engine.New(cfg)
 	cfg.OutputDir = tmpDir
-	eng = engine.New(cfg)
+	eng := engine.New(cfg)
 	if _, err := eng.Generate(); err != nil {
 		t.Fatalf("failed initial generate: %v", err)
 	}

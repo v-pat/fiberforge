@@ -638,9 +638,3 @@ func getHelperContent(modName string) string {
 	}
 	return ""
 }
-
-func writePkg(targetDir, pkgName, fileName, content string) {
-	pkgDir := filepath.Join(targetDir, "pkg", pkgName)
-	_ = os.MkdirAll(pkgDir, 0o755)
-	_ = os.WriteFile(filepath.Join(pkgDir, fileName), []byte(content), 0o644)
-}
