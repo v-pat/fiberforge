@@ -8,7 +8,7 @@ import (
 
 	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"
-	"gopkg.in/yaml.v3"
+	yaml "gopkg.in/yaml.v3"
 
 	"github.com/v-pat/fiberforge/internal/engine"
 	"github.com/v-pat/fiberforge/internal/schema"

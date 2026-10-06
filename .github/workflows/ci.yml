@@ -24,6 +24,9 @@ jobs:
           check-latest: true
           cache: true
 
+      - name: Download dependencies
+        run: go mod download
+
       - name: Run go vet
         run: go vet ./...
 
