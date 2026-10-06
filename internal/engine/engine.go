@@ -14,18 +14,62 @@ import (
 
 // Engine turns a schema.Config into a generated project on disk.
 type Engine struct {
-	cfg *schema.Config
-	dir string // output directory prefix
+	cfg     *schema.Config
+	dir     string // output directory prefix
+	initErr error
 }
 
 // New creates an Engine for the given config. The output directory is
 // config.OutputDir if set, otherwise "./<appName>".
 func New(cfg *schema.Config) *Engine {
+	for i := range cfg.Models {
+		m := &cfg.Models[i]
+		if m.Owner {
+			m.AuthProtected = true
+			hasUserRel := false
+			for _, r := range m.Relationships {
+				if r.Type == schema.BelongsTo && strings.EqualFold(r.Model, "user") {
+					hasUserRel = true
+					break
+				}
+			}
+			hasUserIDField := false
+			for _, f := range m.Fields {
+				if strings.EqualFold(f.Name, "userid") || strings.EqualFold(f.Name, "user_id") {
+					hasUserIDField = true
+					break
+				}
+			}
+			if !hasUserRel && !hasUserIDField {
+				m.Relationships = append(m.Relationships, schema.Relationship{
+					Type:  schema.BelongsTo,
+					Model: "user",
+				})
+			}
+		}
+	}
+
 	dir := cfg.OutputDir
 	if dir == "" {
 		dir = "./" + cfg.AppName
 	}
-	return &Engine{cfg: cfg, dir: dir}
+	root := cfg.WorkspaceRoot
+	if root == "" {
+		root = os.Getenv("FIBERFORGE_WORKSPACE_ROOT")
+	}
+
+	var safeDir string
+	var err error
+	if root != "" || !filepath.IsAbs(dir) {
+		safeDir, err = schema.ResolveSafePath(dir, root)
+	} else {
+		safeDir, err = filepath.Abs(dir)
+	}
+
+	if err != nil {
+		return &Engine{cfg: cfg, dir: dir, initErr: err}
+	}
+	return &Engine{cfg: cfg, dir: safeDir}
 }
 
 // Config exposes the underlying config to the MCP layer.
@@ -81,7 +125,18 @@ func (e *Engine) render(name, source string, data any) (string, error) {
 // write ensures dirs exist and writes a file with the given content. Go source
 // files are formatted with gofmt so the generated output is clean.
 func (e *Engine) write(relPath, content string) error {
-	abs := filepath.Join(e.dir, relPath)
+	if e.initErr != nil {
+		return fmt.Errorf("insecure output directory: %w", e.initErr)
+	}
+	cleanRel := filepath.Clean(relPath)
+	if cleanRel == ".." || strings.HasPrefix(cleanRel, ".."+string(filepath.Separator)) || filepath.IsAbs(relPath) {
+		return fmt.Errorf("path traversal attempt in relative file path: %q", relPath)
+	}
+	abs := filepath.Join(e.dir, cleanRel)
+	rel, err := filepath.Rel(e.dir, abs)
+	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return fmt.Errorf("file path %q escapes output directory %q", abs, e.dir)
+	}
 	if err := os.MkdirAll(filepath.Dir(abs), 0o755); err != nil {
 		return err
 	}

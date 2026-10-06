@@ -11,9 +11,13 @@ RUN CGO_ENABLED=0 go build -o /bin/{{.AppName}} .
 
 # ---- Runtime stage ----
 FROM alpine:3.20
-RUN apk --no-cache add ca-certificates
+RUN apk --no-cache add ca-certificates && \
+    addgroup -S appgroup && \
+    adduser -S appuser -G appgroup
 WORKDIR /app
 COPY --from=build /bin/{{.AppName}} .
+RUN chown -R appuser:appgroup /app
+USER appuser
 EXPOSE {{.Port}}
 ENTRYPOINT ["/app/{{.AppName}}"]
 `
@@ -30,10 +34,10 @@ services:
       DB_HOST: {{.DbHost}}
       DB_PORT: "{{.DbPort}}"
       DB_USER: {{.DbUser}}
-      DB_PASSWORD: {{.DbPassword}}
+      DB_PASSWORD: ${DB_PASSWORD:-{{.DbPassword}}}
       DB_NAME: {{.AppName}}
       PORT: "{{.Port}}"
-      {{if .Auth}}JWT_SECRET: change-me-in-production
+      {{if .Auth}}JWT_SECRET: ${JWT_SECRET:-dev-jwt-secret-do-not-use-in-production}
       {{end}}
     depends_on:
       db:
@@ -115,6 +119,9 @@ on:
   push:
     branches: [main]
   pull_request:
+
+permissions:
+  contents: read
 
 jobs:
   test:

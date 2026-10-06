@@ -75,6 +75,7 @@ func (e *Engine) renderEnv() (string, error) {
 		"DbType":     e.cfg.Database,
 		"Port":       fmt.Sprintf("%d", e.cfg.Port),
 		"Auth":       e.cfg.Features.Auth,
+		"CORS":       e.cfg.Features.CORS,
 		"Env":        e.cfg.Env,
 	})
 }

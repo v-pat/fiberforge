@@ -51,6 +51,20 @@ No AI required — the schema drives deterministic code generation.`,
 		if outputDir != "" {
 			cfg.OutputDir = outputDir
 		}
+		targetDir := cfg.OutputDir
+		if targetDir == "" {
+			targetDir = "./" + cfg.AppName
+		}
+		root := os.Getenv("FIBERFORGE_WORKSPACE_ROOT")
+		if root == "" {
+			root, _ = os.Getwd()
+		}
+		safeDir, err := schema.ResolveSafePath(targetDir, root)
+		if err != nil {
+			return fmt.Errorf("invalid output directory: %w", err)
+		}
+		cfg.OutputDir = safeDir
+		cfg.WorkspaceRoot = root
 		eng := engine.New(cfg)
 		if dryRun {
 			if jsonOutput {

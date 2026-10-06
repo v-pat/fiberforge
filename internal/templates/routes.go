@@ -5,7 +5,10 @@ package templates
 const RoutesTemplate = `package routes
 
 import (
-	"github.com/gofiber/fiber/v2"
+{{if .AuthEnabled}}	"time"
+
+	"github.com/gofiber/fiber/v2/middleware/limiter"
+{{end}}	"github.com/gofiber/fiber/v2"
 
 	"{{.AppName}}/controller"
 	"{{.AppName}}/databases"
@@ -21,16 +24,32 @@ func Routes(app *fiber.App) {
 	})
 	app.Get("/health/ready", func(c *fiber.Ctx) error {
 		if err := databases.Ping(); err != nil {
-			return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{"status": "DOWN", "error": err.Error()})
+			return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{"status": "DOWN", "error": "service unavailable"})
 		}
 		return c.Status(fiber.StatusOK).JSON(fiber.Map{"status": "UP"})
 	})
 
 	api := app.Group("/api")
 	{{if .AuthEnabled}}
-	// Unprotected auth endpoints.
-	api.Post("/auth/register", controller.Register)
-	api.Post("/auth/login", controller.Login)
+	authLimiter := limiter.New(limiter.Config{
+		Max:        10,
+		Expiration: 1 * time.Minute,
+		KeyGenerator: func(c *fiber.Ctx) string {
+			return c.IP()
+		},
+		LimitReached: func(c *fiber.Ctx) error {
+			return c.Status(fiber.StatusTooManyRequests).JSON(fiber.Map{
+				"success": false,
+				"error": fiber.Map{
+					"code":    "TOO_MANY_REQUESTS",
+					"message": "too many authentication attempts, please try again later",
+				},
+			})
+		},
+	})
+	// Auth endpoints protected by dedicated brute-force rate limiter.
+	api.Post("/auth/register", authLimiter, controller.Register)
+	api.Post("/auth/login", authLimiter, controller.Login)
 
 	authGroup := api.Group("", middleware.JWT(auth.Secret()))
 	authGroup.Get("/auth/me", controller.Me)

@@ -55,6 +55,32 @@ func ApplyDefaults(cfg *Config) error {
 	if cfg.Port == 0 {
 		cfg.Port = 8080
 	}
+	for i := range cfg.Models {
+		m := &cfg.Models[i]
+		if m.Owner {
+			m.AuthProtected = true
+			hasUserRel := false
+			for _, r := range m.Relationships {
+				if r.Type == BelongsTo && strings.EqualFold(r.Model, "user") {
+					hasUserRel = true
+					break
+				}
+			}
+			hasUserIDField := false
+			for _, f := range m.Fields {
+				if strings.EqualFold(f.Name, "userid") || strings.EqualFold(f.Name, "user_id") {
+					hasUserIDField = true
+					break
+				}
+			}
+			if !hasUserRel && !hasUserIDField {
+				m.Relationships = append(m.Relationships, Relationship{
+					Type:  BelongsTo,
+					Model: "user",
+				})
+			}
+		}
+	}
 	return nil
 }
 
@@ -62,6 +88,9 @@ func ApplyDefaults(cfg *Config) error {
 func Validate(cfg *Config) error {
 	if cfg.AppName == "" {
 		return fmt.Errorf("appName is required")
+	}
+	if err := ValidateAppName(cfg.AppName); err != nil {
+		return err
 	}
 	if cfg.Framework != "fiber" {
 		return fmt.Errorf("unsupported framework %q (only fiber is supported)", cfg.Framework)
@@ -115,8 +144,14 @@ func Validate(cfg *Config) error {
 			return fmt.Errorf("duplicate model name %q", m.Name)
 		}
 		nameSeen[strings.ToLower(m.Name)] = true
-		if m.Endpoint == "" {
-			return fmt.Errorf("model %q is missing an endpoint", m.Name)
+		if m.TableName != "" && !identRe.MatchString(m.TableName) {
+			return fmt.Errorf("model %q tableName %q is not a valid identifier", m.Name, m.TableName)
+		}
+		if m.Owner && !cfg.Features.Auth {
+			return fmt.Errorf("model %q has owner: true but features.auth is not enabled", m.Name)
+		}
+		if err := ValidateEndpoint(m.Endpoint); err != nil {
+			return fmt.Errorf("model %q: %w", m.Name, err)
 		}
 		for _, f := range m.Fields {
 			if f.Name == "" {
@@ -156,6 +191,12 @@ func isReferenced(name string, cfg *Config) bool {
 }
 
 func validateField(f Field) error {
+	if err := validateFieldTags(f); err != nil {
+		return err
+	}
+	if err := validateDefault(f); err != nil {
+		return err
+	}
 	switch f.Type {
 	case TypeString, TypeText, TypeInt, TypeInt64, TypeFloat, TypeBool,
 		TypeTime, TypeUUID, TypeJSON, TypePassword:
@@ -168,4 +209,104 @@ func validateField(f Field) error {
 	default:
 		return fmt.Errorf("unsupported field type %q", f.Type)
 	}
+}
+
+var jsonTagRe = regexp.MustCompile(`^[a-zA-Z0-9_.-]+$`)
+var validationRe = regexp.MustCompile(`^[a-zA-Z0-9_=,.-]+$`)
+
+func validateFieldTags(f Field) error {
+	if f.JSONTag != "" {
+		if !jsonTagRe.MatchString(f.JSONTag) || strings.Contains(f.JSONTag, "..") {
+			return fmt.Errorf("invalid jsonTag %q: must contain only alphanumeric characters, underscores, hyphens, or dots", f.JSONTag)
+		}
+	}
+	if f.Validation != "" {
+		if !validationRe.MatchString(f.Validation) || strings.ContainsAny(f.Validation, "`\r\n\"") {
+			return fmt.Errorf("invalid validation rules %q: contains illegal characters", f.Validation)
+		}
+	}
+	return nil
+}
+
+var endpointRe = regexp.MustCompile(`^[a-zA-Z0-9/_-]+$`)
+
+// ValidateEndpoint verifies that an endpoint path contains only valid URL segment characters without path traversal.
+func ValidateEndpoint(ep string) error {
+	if ep == "" {
+		return fmt.Errorf("endpoint cannot be empty")
+	}
+	if !endpointRe.MatchString(ep) || strings.Contains(ep, "..") {
+		return fmt.Errorf("endpoint %q contains invalid characters (must match %s without '..')", ep, endpointRe.String())
+	}
+	return nil
+}
+
+var (
+	intDefaultRe    = regexp.MustCompile(`^[+-]?[0-9]+$`)
+	floatDefaultRe  = regexp.MustCompile(`^[+-]?[0-9]+(\.[0-9]+)?$`)
+	stringDefaultRe = regexp.MustCompile(`^[a-zA-Z0-9_ -]+$`)
+)
+
+func validateDefault(f Field) error {
+	if f.Default == nil {
+		return nil
+	}
+	val := strings.TrimSpace(*f.Default)
+	if val == "" {
+		return nil
+	}
+	// Reject SQL injection / comment / statement termination characters
+	if strings.ContainsAny(val, ";'\"`\r\n\x00") || strings.Contains(val, "--") || strings.Contains(val, "/*") || strings.Contains(val, "*/") {
+		return fmt.Errorf("invalid default value %q: contains illegal characters or SQL injection tokens", val)
+	}
+
+	switch f.Type {
+	case TypeBool:
+		switch strings.ToLower(val) {
+		case "true", "false", "0", "1":
+			return nil
+		default:
+			return fmt.Errorf("invalid boolean default %q (must be true, false, 0, or 1)", val)
+		}
+	case TypeInt, TypeInt64:
+		if !intDefaultRe.MatchString(val) {
+			return fmt.Errorf("invalid integer default %q", val)
+		}
+	case TypeFloat:
+		if !floatDefaultRe.MatchString(val) {
+			return fmt.Errorf("invalid float default %q", val)
+		}
+	case TypeTime:
+		switch strings.ToUpper(val) {
+		case "CURRENT_TIMESTAMP", "NOW()":
+			return nil
+		default:
+			return fmt.Errorf("invalid time default %q (must be CURRENT_TIMESTAMP or NOW())", val)
+		}
+	case TypeEnum:
+		if len(f.Values) > 0 {
+			found := false
+			for _, v := range f.Values {
+				if v == val {
+					found = true
+					break
+				}
+			}
+			if !found {
+				return fmt.Errorf("default %q is not in enum values %v", val, f.Values)
+			}
+		}
+		if !stringDefaultRe.MatchString(val) {
+			return fmt.Errorf("invalid enum default %q: contains invalid characters", val)
+		}
+	case TypeString, TypeText, TypeUUID:
+		if !stringDefaultRe.MatchString(val) {
+			return fmt.Errorf("invalid string default %q: contains invalid characters", val)
+		}
+	case TypeJSON:
+		if val != "{}" && val != "[]" {
+			return fmt.Errorf("invalid JSON default %q (only '{}' or '[]' allowed)", val)
+		}
+	}
+	return nil
 }

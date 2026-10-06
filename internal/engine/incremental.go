@@ -19,6 +19,12 @@ func AddModel(targetDir string, m schema.Model) error {
 
 // AddModelWithOptions incrementally adds a model with optional dry-run mode. Returns affected file paths.
 func AddModelWithOptions(targetDir string, m schema.Model, dryRun bool) ([]string, error) {
+	safeTargetDir, err := schema.ResolveSafePath(targetDir, "")
+	if err != nil {
+		return nil, fmt.Errorf("invalid target directory: %w", err)
+	}
+	targetDir = safeTargetDir
+
 	schemaPath := filepath.Join(targetDir, "fiberforge.yaml")
 	cfg, err := schema.Load(schemaPath)
 	if err != nil {
@@ -92,8 +98,10 @@ func AddModelWithOptions(targetDir string, m schema.Model, dryRun bool) ([]strin
 		svcTmpl = mongoServiceTemplate
 	}
 	svcContent, err := eng.render("service", svcTmpl, map[string]any{
-		"AppName": eng.AppModule(),
-		"Name":    schema.Pascal(m.Name),
+		"AppName":        eng.AppModule(),
+		"Name":           schema.Pascal(m.Name),
+		"IsOwned":        isModelOwned(m, cfg.Features.Auth),
+		"WritableFields": eng.writableFields(m),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to render service: %w", err)
@@ -108,9 +116,11 @@ func AddModelWithOptions(targetDir string, m schema.Model, dryRun bool) ([]strin
 		ctrlTmpl = mongoControllerTemplate
 	}
 	ctrlContent, err := eng.render("controller", ctrlTmpl, map[string]any{
-		"AppName":  eng.AppModule(),
-		"Name":     schema.Pascal(m.Name),
-		"Endpoint": m.Endpoint,
+		"AppName":        eng.AppModule(),
+		"Name":           schema.Pascal(m.Name),
+		"Endpoint":       m.Endpoint,
+		"IsOwned":        isModelOwned(m, cfg.Features.Auth),
+		"WritableFields": eng.writableFields(m),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to render controller: %w", err)

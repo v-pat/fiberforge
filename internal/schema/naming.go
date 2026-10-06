@@ -34,6 +34,24 @@ func Lower(s string) string {
 	return strings.ToLower(strings.TrimSpace(s))
 }
 
+// Snake converts a name to snake_case.
+func Snake(s string) string {
+	var b strings.Builder
+	for i, r := range s {
+		if r >= 'A' && r <= 'Z' {
+			if i > 0 && s[i-1] != '_' && s[i-1] != '-' && (s[i-1] < 'A' || s[i-1] > 'Z') {
+				b.WriteByte('_')
+			}
+			b.WriteRune(r + ('a' - 'A'))
+		} else if r == '-' || r == ' ' {
+			b.WriteByte('_')
+		} else {
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
+}
+
 // Plural returns a naive lowercase pluralized name used for table/collection
 // names and route groups. It handles common English suffixes.
 func Plural(s string) string {

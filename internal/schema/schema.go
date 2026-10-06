@@ -9,8 +9,9 @@ type Config struct {
 	Port      int            `yaml:"port" json:"port"`
 	Features  Features       `yaml:"features" json:"features"`
 	Models    []Model        `yaml:"models" json:"models"`
-	OutputDir string         `yaml:"outputDir" json:"outputDir,omitempty"`
-	Env       map[string]any `yaml:"env" json:"env,omitempty"`
+	OutputDir     string         `yaml:"outputDir" json:"outputDir,omitempty"`
+	WorkspaceRoot string         `yaml:"workspaceRoot,omitempty" json:"workspaceRoot,omitempty"`
+	Env           map[string]any `yaml:"env" json:"env,omitempty"`
 }
 
 // Features are opt-in capabilities generated alongside the CRUD scaffold.
@@ -81,5 +82,6 @@ type Model struct {
 	Fields        []Field        `yaml:"fields" json:"fields"`
 	Relationships []Relationship `yaml:"relationships,omitempty" json:"relationships,omitempty"`
 	AuthProtected bool           `yaml:"auth" json:"auth"`
+	Owner         bool           `yaml:"owner,omitempty" json:"owner,omitempty"`
 	TableName     string         `yaml:"tableName,omitempty" json:"tableName,omitempty"`
 }

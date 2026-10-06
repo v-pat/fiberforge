@@ -83,7 +83,8 @@ models:
 
   - name: post
     endpoint: posts
-    auth: true            # Protect routes with JWT
+    auth: true            # Authentication: Protect routes with JWT
+    owner: true           # Authorization: Scope CRUD operations to the authenticated user
     fields:
       - name: title
         type: string
@@ -93,10 +94,23 @@ models:
       - name: published
         type: bool
         default: "false"
-    relationships:
-      - type: belongsTo
-        model: user
+
+  # Example of a shared authenticated resource (accessible by all authenticated users)
+  - name: category
+    endpoint: categories
+    auth: true            # Protected by JWT, but not scoped to individual owners
+    fields:
+      - name: name
+        type: string
+        required: true
 ```
+
+## Security concepts: Authentication vs. Authorization & Ownership
+
+- **Authentication (`auth: true`)**: Determines *who* the caller is. All endpoints for the model require a valid JWT bearer token.
+- **Authorization & Ownership (`owner: true` or `belongsTo: user`)**: Determines *what* records the caller can access. Records are bound to `user_id`, and CRUD operations (GET, LIST, UPDATE, DELETE) are automatically scoped to `WHERE user_id = ?`.
+- **Shared Resources (`auth: true` without `owner: true`)**: Any authenticated user can read or modify records (e.g., shared product catalogs, global categories).
+- **Ambiguous Fields**: Fields like `authorId`, `creatorId`, or `accountId` do *not* automatically enforce ownership scoping unless `owner: true` or `belongsTo: user` is explicitly declared.
 
 ## Supported field types
 

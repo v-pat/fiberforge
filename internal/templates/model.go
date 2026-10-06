@@ -19,10 +19,20 @@ type {{.Name}} struct {
 {{range .Fields}}	{{.GoName}} {{.GoType}} {{.StructTag}}
 {{end}}{{range .Relationships}}	{{.FieldName}} {{.AssocType}} {{.Tag}}
 {{end}}}
+
+// Create{{.Name}}Input represents the client payload for creating a {{.Name}}.
+type Create{{.Name}}Input struct {
+{{range .WritableFields}}	{{.GoName}} {{.GoType}} ` + "`json:\"{{.JSONName}}\"`" + `
+{{end}}}
+
+// Update{{.Name}}Input represents the client payload for updating a {{.Name}}.
+type Update{{.Name}}Input struct {
+{{range .WritableFields}}	{{.GoName}} *{{.GoType}} ` + "`json:\"{{.JSONName}},omitempty\"`" + `
+{{end}}}
 {{if .HasTableName}}
 // TableName returns the explicit table name.
 func ({{.Name}}) TableName() string {
-	return "{{.TableName}}"
+	return {{.QuotedTableName}}
 }
 {{end}}
 `
@@ -41,10 +51,20 @@ type {{.Name}} struct {
 {{range .Fields}}	{{.GoName}} {{.GoType}} ` + "`bson:\"{{.MongoName}}\" json:\"{{.JSONName}}\"`" + `
 {{end}}{{range .Relationships}}	{{.FieldName}} {{.AssocType}} {{.Tag}}
 {{end}}}
+
+// Create{{.Name}}Input represents the client payload for creating a {{.Name}}.
+type Create{{.Name}}Input struct {
+{{range .WritableFields}}	{{.GoName}} {{.GoType}} ` + "`json:\"{{.JSONName}}\"`" + `
+{{end}}}
+
+// Update{{.Name}}Input represents the client payload for updating a {{.Name}}.
+type Update{{.Name}}Input struct {
+{{range .WritableFields}}	{{.GoName}} *{{.GoType}} ` + "`json:\"{{.JSONName}},omitempty\"`" + `
+{{end}}}
 {{if .HasTableName}}
 // CollectionName returns the explicit collection name.
 func ({{.Name}}) CollectionName() string {
-	return "{{.TableName}}"
+	return {{.QuotedTableName}}
 }
 {{end}}
 `

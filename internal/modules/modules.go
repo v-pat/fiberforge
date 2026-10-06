@@ -528,6 +528,12 @@ func Apply(targetDir string, moduleName string) ([]string, error) {
 // ApplyWithOptions appends all models in a module with optional dry-run mode.
 // Returns (addedModelNames, affectedFiles, error).
 func ApplyWithOptions(targetDir string, moduleName string, dryRun bool) ([]string, []string, error) {
+	safeTargetDir, err := schema.ResolveSafePath(targetDir, "")
+	if err != nil {
+		return nil, nil, fmt.Errorf("invalid target directory: %w", err)
+	}
+	targetDir = safeTargetDir
+
 	mod, err := Get(moduleName)
 	if err != nil {
 		return nil, nil, err

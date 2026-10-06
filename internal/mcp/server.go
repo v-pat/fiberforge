@@ -2,11 +2,11 @@ package mcp
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -18,6 +18,9 @@ import (
 	"github.com/v-pat/fiberforge/internal/schema"
 )
 
+// DefaultMaxMessageSize defines the maximum size of a single JSON-RPC message in bytes (4MB).
+const DefaultMaxMessageSize = 4 * 1024 * 1024
+
 // Server is a minimal MCP server exposing FiberForge tools over stdio using
 // JSON-RPC 2.0. It lets an AI agent generate projects by providing a schema.
 //
@@ -25,9 +28,10 @@ import (
 // (which already has model access) calls the tools; the engine keeps code
 // generation deterministic.
 type Server struct {
-	in      io.Reader
-	out     io.Writer
-	Version string
+	in             io.Reader
+	out            io.Writer
+	Version        string
+	MaxMessageSize int
 }
 
 // NewServer creates an MCP server reading from in and writing to out.
@@ -35,7 +39,12 @@ func NewServer(in io.Reader, out io.Writer, version string) *Server {
 	if version == "" {
 		version = "dev"
 	}
-	return &Server{in: in, out: out, Version: version}
+	return &Server{
+		in:             in,
+		out:            out,
+		Version:        version,
+		MaxMessageSize: DefaultMaxMessageSize,
+	}
 }
 
 type rpcRequest struct {
@@ -57,22 +66,76 @@ type rpcError struct {
 	Message string `json:"message"`
 }
 
-// Serve runs the request/response loop until EOF.
+// Serve runs the request/response loop until EOF using a bounded streaming reader.
 func (s *Server) Serve() error {
-	sc := bufio.NewScanner(s.in)
-	sc.Buffer(make([]byte, 0, 64*1024), 4*1024*1024)
-	for sc.Scan() {
-		line := strings.TrimSpace(sc.Text())
-		if line == "" {
-			continue
-		}
-		var req rpcRequest
-		if err := json.Unmarshal([]byte(line), &req); err != nil {
-			continue
-		}
-		s.dispatch(req)
+	maxSize := s.MaxMessageSize
+	if maxSize <= 0 {
+		maxSize = DefaultMaxMessageSize
 	}
-	return sc.Err()
+
+	reader := bufio.NewReaderSize(s.in, 64*1024)
+	for {
+		var buf bytes.Buffer
+		oversized := false
+
+		for {
+			chunk, isPrefix, err := reader.ReadLine()
+			if err != nil {
+				if err == io.EOF {
+					if buf.Len() > 0 && !oversized {
+						s.processLine(buf.Bytes())
+					}
+					return nil
+				}
+				return err
+			}
+
+			if !oversized {
+				if buf.Len()+len(chunk) > maxSize {
+					oversized = true
+					buf.Reset() // Release memory immediately so usage stays bounded
+				} else {
+					buf.Write(chunk)
+				}
+			}
+
+			if !isPrefix {
+				break
+			}
+		}
+
+		if oversized {
+			s.write(rpcResponse{
+				JSONRPC: "2.0",
+				Error: &rpcError{
+					Code:    -32600,
+					Message: fmt.Sprintf("request entity too large: message exceeds %d bytes", maxSize),
+				},
+			})
+			continue
+		}
+
+		s.processLine(buf.Bytes())
+	}
+}
+
+func (s *Server) processLine(data []byte) {
+	line := bytes.TrimSpace(data)
+	if len(line) == 0 {
+		return
+	}
+	var req rpcRequest
+	if err := json.Unmarshal(line, &req); err != nil {
+		s.write(rpcResponse{
+			JSONRPC: "2.0",
+			Error: &rpcError{
+				Code:    -32700,
+				Message: "parse error: invalid JSON-RPC payload",
+			},
+		})
+		return
+	}
+	s.dispatch(req)
 }
 
 func (s *Server) dispatch(req rpcRequest) {
@@ -181,28 +244,28 @@ func (s *Server) generateProject(args json.RawMessage) (any, *rpcError) {
 		cfg.OutputDir = input.Output
 	}
 
-	// Workspace root guard: ensure output directory stays within CWD.
-	if cfg.OutputDir != "" {
-		absOut, err := filepath.Abs(cfg.OutputDir)
-		if err != nil {
-			return nil, &rpcError{Code: -32602, Message: "invalid outputDir: " + err.Error()}
-		}
-		cwd, err := os.Getwd()
-		if err != nil {
-			return nil, &rpcError{Code: -32603, Message: "cannot determine working directory: " + err.Error()}
-		}
-		if !strings.HasPrefix(absOut, cwd+string(filepath.Separator)) && absOut != cwd {
-			return map[string]any{
-				"content": []any{
-					map[string]any{
-						"type": "text",
-						"text": fmt.Sprintf("outputDir %q resolves to %q which is outside the workspace root %q. Generation refused for safety.", cfg.OutputDir, absOut, cwd),
-					},
-				},
-				"isError": true,
-			}, nil
-		}
+	targetDir := cfg.OutputDir
+	if targetDir == "" {
+		targetDir = "./" + cfg.AppName
 	}
+	root := os.Getenv("FIBERFORGE_WORKSPACE_ROOT")
+	if root == "" {
+		root, _ = os.Getwd()
+	}
+	safeDir, err := schema.ResolveSafePath(targetDir, root)
+	if err != nil {
+		return map[string]any{
+			"content": []any{
+				map[string]any{
+					"type": "text",
+					"text": fmt.Sprintf("output directory %q is invalid or outside workspace: %v. Generation refused for safety.", targetDir, err),
+				},
+			},
+			"isError": true,
+		}, nil
+	}
+	cfg.OutputDir = safeDir
+	cfg.WorkspaceRoot = root
 
 	eng := engine.New(cfg)
 	dir, err := eng.Generate()
@@ -424,6 +487,23 @@ func (s *Server) addModel(args json.RawMessage) (any, *rpcError) {
 	if targetDir == "" {
 		targetDir = "."
 	}
+	root := os.Getenv("FIBERFORGE_WORKSPACE_ROOT")
+	if root == "" {
+		root, _ = os.Getwd()
+	}
+	safeDir, err := schema.ResolveSafePath(targetDir, root)
+	if err != nil {
+		return map[string]any{
+			"content": []any{
+				map[string]any{
+					"type": "text",
+					"text": fmt.Sprintf("targetDir %q is invalid or outside workspace: %v", targetDir, err),
+				},
+			},
+			"isError": true,
+		}, nil
+	}
+	targetDir = safeDir
 
 	var m schema.Model
 	if err := yaml.Unmarshal([]byte(input.Model), &m); err != nil {
@@ -500,6 +580,23 @@ func (s *Server) applyModule(args json.RawMessage) (any, *rpcError) {
 	if targetDir == "" {
 		targetDir = "."
 	}
+	root := os.Getenv("FIBERFORGE_WORKSPACE_ROOT")
+	if root == "" {
+		root, _ = os.Getwd()
+	}
+	safeDir, err := schema.ResolveSafePath(targetDir, root)
+	if err != nil {
+		return map[string]any{
+			"content": []any{
+				map[string]any{
+					"type": "text",
+					"text": fmt.Sprintf("targetDir %q is invalid or outside workspace: %v", targetDir, err),
+				},
+			},
+			"isError": true,
+		}, nil
+	}
+	targetDir = safeDir
 
 	added, files, err := modules.ApplyWithOptions(targetDir, input.Module, input.DryRun)
 	if err != nil {

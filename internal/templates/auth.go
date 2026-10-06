@@ -246,6 +246,8 @@ const AuthControllerTemplate = `// controller/auth_controller.go
 package controller
 
 import (
+	"log/slog"
+
 	"github.com/gofiber/fiber/v2"
 
 	"{{.AppName}}/auth"
@@ -253,8 +255,8 @@ import (
 )
 
 type credentials struct {
-	Email    string ` + "`json:\"email\"`" + `
-	Password string ` + "`json:\"password\"`" + `
+	Email    string ` + "`json:\"email\" validate:\"required,email,max=255\"`" + `
+	Password string ` + "`json:\"password\" validate:\"required,min=8,max=72\"`" + `
 }
 
 // Register handles POST /api/auth/register.
@@ -268,10 +270,12 @@ func Register(c *fiber.Ctx) error {
 	}
 	user, err := auth.Register(req.Email, req.Password)
 	if err != nil {
-		return SendError(c, fiber.StatusConflict, "CONFLICT", err.Error(), nil)
+		slog.Error("failed to register user", "error", err)
+		return SendError(c, fiber.StatusConflict, "CONFLICT", "unable to register account", nil)
 	}
 	token, err := auth.GenerateToken(user.ID)
 	if err != nil {
+		slog.Error("failed to issue token", "error", err)
 		return SendError(c, fiber.StatusInternalServerError, "INTERNAL_ERROR", "failed to issue token", nil)
 	}
 	return SendSuccess(c, fiber.StatusCreated, fiber.Map{"token": token})
@@ -288,10 +292,11 @@ func Login(c *fiber.Ctx) error {
 	}
 	user, err := auth.Login(req.Email, req.Password)
 	if err != nil {
-		return SendError(c, fiber.StatusUnauthorized, "UNAUTHORIZED", err.Error(), nil)
+		return SendError(c, fiber.StatusUnauthorized, "UNAUTHORIZED", "invalid credentials", nil)
 	}
 	token, err := auth.GenerateToken(user.ID)
 	if err != nil {
+		slog.Error("failed to issue token", "error", err)
 		return SendError(c, fiber.StatusInternalServerError, "INTERNAL_ERROR", "failed to issue token", nil)
 	}
 	return SendSuccess(c, fiber.StatusOK, fiber.Map{"token": token})
@@ -305,7 +310,7 @@ func Me(c *fiber.Ctx) error {
 	}
 	m, err := service.GetUserByID(id)
 	if err != nil {
-		return SendError(c, fiber.StatusNotFound, "NOT_FOUND", err.Error(), nil)
+		return SendError(c, fiber.StatusNotFound, "NOT_FOUND", "account not found", nil)
 	}
 	return SendSuccess(c, fiber.StatusOK, m)
 }
@@ -318,6 +323,7 @@ func Refresh(c *fiber.Ctx) error {
 	}
 	token, err := auth.GenerateToken(id)
 	if err != nil {
+		slog.Error("failed to issue token", "error", err)
 		return SendError(c, fiber.StatusInternalServerError, "INTERNAL_ERROR", "failed to issue token", nil)
 	}
 	return SendSuccess(c, fiber.StatusOK, fiber.Map{"token": token})
@@ -329,6 +335,8 @@ const MongoAuthControllerTemplate = `// controller/auth_controller.go
 package controller
 
 import (
+	"log/slog"
+
 	"github.com/gofiber/fiber/v2"
 
 	"{{.AppName}}/auth"
@@ -336,8 +344,8 @@ import (
 )
 
 type credentials struct {
-	Email    string ` + "`json:\"email\"`" + `
-	Password string ` + "`json:\"password\"`" + `
+	Email    string ` + "`json:\"email\" validate:\"required,email,max=255\"`" + `
+	Password string ` + "`json:\"password\" validate:\"required,min=8,max=72\"`" + `
 }
 
 // Register handles POST /api/auth/register.
@@ -351,10 +359,12 @@ func Register(c *fiber.Ctx) error {
 	}
 	user, err := auth.Register(req.Email, req.Password)
 	if err != nil {
-		return SendError(c, fiber.StatusConflict, "CONFLICT", err.Error(), nil)
+		slog.Error("failed to register user", "error", err)
+		return SendError(c, fiber.StatusConflict, "CONFLICT", "unable to register account", nil)
 	}
 	token, err := auth.GenerateToken(user.ID.Hex())
 	if err != nil {
+		slog.Error("failed to issue token", "error", err)
 		return SendError(c, fiber.StatusInternalServerError, "INTERNAL_ERROR", "failed to issue token", nil)
 	}
 	return SendSuccess(c, fiber.StatusCreated, fiber.Map{"token": token})
@@ -371,10 +381,11 @@ func Login(c *fiber.Ctx) error {
 	}
 	user, err := auth.Login(req.Email, req.Password)
 	if err != nil {
-		return SendError(c, fiber.StatusUnauthorized, "UNAUTHORIZED", err.Error(), nil)
+		return SendError(c, fiber.StatusUnauthorized, "UNAUTHORIZED", "invalid credentials", nil)
 	}
 	token, err := auth.GenerateToken(user.ID.Hex())
 	if err != nil {
+		slog.Error("failed to issue token", "error", err)
 		return SendError(c, fiber.StatusInternalServerError, "INTERNAL_ERROR", "failed to issue token", nil)
 	}
 	return SendSuccess(c, fiber.StatusOK, fiber.Map{"token": token})
@@ -388,7 +399,7 @@ func Me(c *fiber.Ctx) error {
 	}
 	m, err := service.GetUserByID(id)
 	if err != nil {
-		return SendError(c, fiber.StatusNotFound, "NOT_FOUND", err.Error(), nil)
+		return SendError(c, fiber.StatusNotFound, "NOT_FOUND", "account not found", nil)
 	}
 	return SendSuccess(c, fiber.StatusOK, m)
 }
@@ -401,6 +412,7 @@ func Refresh(c *fiber.Ctx) error {
 	}
 	token, err := auth.GenerateToken(id)
 	if err != nil {
+		slog.Error("failed to issue token", "error", err)
 		return SendError(c, fiber.StatusInternalServerError, "INTERNAL_ERROR", "failed to issue token", nil)
 	}
 	return SendSuccess(c, fiber.StatusOK, fiber.Map{"token": token})
@@ -413,6 +425,7 @@ package auth
 
 import (
 	"errors"
+	"log"
 	"os"
 	"time"
 
@@ -430,7 +443,8 @@ func Secret() []byte {
 	if s := os.Getenv("JWT_SECRET"); s != "" {
 		return []byte(s)
 	}
-	return []byte("change-me-in-production")
+	log.Fatal("JWT_SECRET environment variable is not set")
+	return nil
 }
 
 // GenerateToken issues a signed token for the given user id.

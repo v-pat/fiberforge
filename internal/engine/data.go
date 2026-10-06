@@ -2,6 +2,7 @@ package engine
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/v-pat/fiberforge/internal/schema"
@@ -52,25 +53,68 @@ func (e *Engine) modelData(m schema.Model) modelModel {
 				JSONName:  r.RefVar + "Id",
 			}
 		} else {
+			fkCol := schema.Snake(r.GoName) + "_id"
 			fk = fieldModel{
 				GoName:    r.RefIDName,
 				GoType:    "uint",
 				JSONName:  r.RefVar + "Id",
-				StructTag: "`gorm:\"index\" json:\"" + r.RefVar + "Id\"`",
+				StructTag: "`gorm:\"column:" + fkCol + ";index\" json:\"" + r.RefVar + "Id\"`",
 			}
 		}
 		fields = append(fields, fk)
 	}
 
 	return modelModel{
-		Name:          schema.Pascal(m.Name),
-		Fields:        fields,
-		HasUUID:       hasUUID,
-		HasTableName:  m.TableName != "",
-		TableName:     m.TableName,
-		HasFK:         hasFK,
-		Relationships: rels,
+		Name:            schema.Pascal(m.Name),
+		Fields:          fields,
+		WritableFields:  e.writableFields(m),
+		HasUUID:         hasUUID,
+		HasTableName:    m.TableName != "",
+		TableName:       m.TableName,
+		QuotedTableName: strconv.Quote(m.TableName),
+		HasFK:           hasFK,
+		Relationships:   rels,
 	}
+}
+
+func isWritableField(f schema.Field) bool {
+	lower := strings.ToLower(f.Name)
+	if lower == "id" || lower == "createdat" || lower == "created_at" ||
+		lower == "updatedat" || lower == "updated_at" ||
+		lower == "deletedat" || lower == "deleted_at" ||
+		lower == "userid" || lower == "user_id" {
+		return false
+	}
+	return true
+}
+
+// writableFields returns client-writable fields (excluding protected IDs, timestamps, FKs).
+func (e *Engine) writableFields(m schema.Model) []fieldModel {
+	var out []fieldModel
+	for _, f := range m.Fields {
+		if !isWritableField(f) {
+			continue
+		}
+		gt := goType(f)
+		if e.isMongo() {
+			gt = goTypeMongo(f)
+		}
+		jsonName := f.JSONTag
+		if jsonName == "" {
+			jsonName = f.Name
+		}
+		fm := fieldModel{
+			GoName:    schema.Pascal(f.Name),
+			GoType:    gt,
+			JSONName:  jsonName,
+			MongoName: f.Name,
+		}
+		if !e.isMongo() {
+			fm.StructTag = buildStructTag(f, jsonName)
+		}
+		out = append(out, fm)
+	}
+	return out
 }
 
 // relationshipData maps declared relationships to renderable association fields.
@@ -127,6 +171,7 @@ func (e *Engine) relationshipData(m schema.Model) []relationshipModel {
 
 // buildStructTag assembles a single gorm+json struct tag for a SQL field.
 func buildStructTag(f schema.Field, jsonName string) string {
+	cleanJSON := sanitizeTagValue(jsonName)
 	var parts []string
 	if f.Unique {
 		parts = append(parts, "uniqueIndex")
@@ -141,11 +186,11 @@ func buildStructTag(f schema.Field, jsonName string) string {
 	if len(parts) > 0 {
 		gorm = `gorm:"` + joinTags(parts) + `" `
 	}
-	jsonTag := `json:"` + jsonName + `"`
+	jsonTag := `json:"` + cleanJSON + `"`
 	if f.Sensitive {
 		jsonTag = `json:"-"`
 	} else if f.OmitEmpty {
-		jsonTag = `json:"` + jsonName + `,omitempty"`
+		jsonTag = `json:"` + cleanJSON + `,omitempty"`
 	}
 
 	var valRules []string
@@ -153,7 +198,7 @@ func buildStructTag(f schema.Field, jsonName string) string {
 		valRules = append(valRules, "required")
 	}
 	if f.Validation != "" {
-		valRules = append(valRules, f.Validation)
+		valRules = append(valRules, sanitizeTagValue(f.Validation))
 	}
 	valTag := ""
 	if len(valRules) > 0 {
@@ -161,6 +206,14 @@ func buildStructTag(f schema.Field, jsonName string) string {
 	}
 
 	return "`" + gorm + jsonTag + valTag + "`"
+}
+
+func sanitizeTagValue(s string) string {
+	s = strings.ReplaceAll(s, "`", "")
+	s = strings.ReplaceAll(s, "\"", "")
+	s = strings.ReplaceAll(s, "\n", "")
+	s = strings.ReplaceAll(s, "\r", "")
+	return s
 }
 
 // modelPascalNames returns the Pascal-cased model names for AutoMigrate.
@@ -180,25 +233,68 @@ func dsnFormat(driver string) string {
 	return "%s:%s@tcp(%s:%s)/%s?charset=utf8mb4&parseTime=True&loc=Local"
 }
 
+// quoteIdentifier wraps an identifier in dialect-appropriate quotes.
+func quoteIdentifier(ident, driver string) string {
+	if driver == "postgres" {
+		return `"` + strings.ReplaceAll(ident, `"`, `""`) + `"`
+	}
+	return "`" + strings.ReplaceAll(ident, "`", "``") + "`"
+}
+
+// formatDefault returns a safe SQL representation of the field's default value.
+func formatDefault(f schema.Field, driver string) string {
+	if f.Default == nil {
+		return ""
+	}
+	raw := strings.TrimSpace(*f.Default)
+	switch f.Type {
+	case schema.TypeBool:
+		if strings.EqualFold(raw, "true") || raw == "1" {
+			if driver == "mysql" {
+				return "1"
+			}
+			return "TRUE"
+		}
+		if strings.EqualFold(raw, "false") || raw == "0" {
+			if driver == "mysql" {
+				return "0"
+			}
+			return "FALSE"
+		}
+		return raw
+	case schema.TypeInt, schema.TypeInt64, schema.TypeFloat:
+		return raw
+	case schema.TypeTime:
+		return "CURRENT_TIMESTAMP"
+	case schema.TypeString, schema.TypeText, schema.TypeEnum, schema.TypeUUID:
+		escaped := strings.ReplaceAll(raw, "'", "''")
+		return "'" + escaped + "'"
+	default:
+		return raw
+	}
+}
+
 // buildMigration generates up/down SQL for a model on a given driver.
 func buildMigration(m schema.Model, driver string) (up, down string) {
 	table := m.TableName
 	if table == "" {
 		table = schema.Plural(m.Name)
 	}
+	quotedTable := quoteIdentifier(table, driver)
 	var cols []string
 	for _, f := range m.Fields {
 		cols = append(cols, columnDDL(f, driver))
 	}
 	for _, r := range m.Relationships {
 		if r.Type == schema.BelongsTo {
-			cols = append(cols, "\t"+schema.Camel(r.Model)+"Id BIGINT")
+			fkCol := quoteIdentifier(schema.Snake(r.Model)+"_id", driver)
+			cols = append(cols, "\t"+fkCol+" BIGINT")
 		}
 	}
 	colStr := ",\n\t" + strings.Join(cols, ",\n\t")
-	up = fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (\n\tid %s PRIMARY KEY%s\n);\n",
-		table, idType(driver), colStr)
-	down = fmt.Sprintf("DROP TABLE IF EXISTS %s;\n", table)
+	up = fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (\n\t%s %s PRIMARY KEY%s\n);\n",
+		quotedTable, quoteIdentifier("id", driver), idType(driver), colStr)
+	down = fmt.Sprintf("DROP TABLE IF EXISTS %s;\n", quotedTable)
 
 	for _, r := range m.Relationships {
 		if r.Type == schema.ManyToMany {
@@ -208,11 +304,12 @@ func buildMigration(m schema.Model, driver string) (up, down string) {
 			}
 			targetTable := schema.Plural(r.Model)
 			joinTable := schema.Lower(selfTable) + "_" + schema.Lower(targetTable)
-			selfFK := schema.Camel(m.Name) + "Id"
-			targetFK := schema.Camel(r.Model) + "Id"
+			quotedJoinTable := quoteIdentifier(joinTable, driver)
+			selfFK := quoteIdentifier(schema.Camel(m.Name)+"Id", driver)
+			targetFK := quoteIdentifier(schema.Camel(r.Model)+"Id", driver)
 			up += fmt.Sprintf("\nCREATE TABLE IF NOT EXISTS %s (\n\t%s BIGINT NOT NULL,\n\t%s BIGINT NOT NULL,\n\tPRIMARY KEY (%s, %s)\n);\n",
-				joinTable, selfFK, targetFK, selfFK, targetFK)
-			down += fmt.Sprintf("DROP TABLE IF EXISTS %s;\n", joinTable)
+				quotedJoinTable, selfFK, targetFK, selfFK, targetFK)
+			down += fmt.Sprintf("DROP TABLE IF EXISTS %s;\n", quotedJoinTable)
 		}
 	}
 	return up, down
@@ -220,7 +317,7 @@ func buildMigration(m schema.Model, driver string) (up, down string) {
 
 func columnDDL(f schema.Field, driver string) string {
 	colType := columnType(f, driver)
-	parts := []string{"\t" + f.Name + " " + colType}
+	parts := []string{"\t" + quoteIdentifier(f.Name, driver) + " " + colType}
 	if f.Required {
 		parts = append(parts, "NOT NULL")
 	}
@@ -228,7 +325,10 @@ func columnDDL(f schema.Field, driver string) string {
 		parts = append(parts, "UNIQUE")
 	}
 	if f.Default != nil {
-		parts = append(parts, "DEFAULT "+*f.Default)
+		defVal := formatDefault(f, driver)
+		if defVal != "" {
+			parts = append(parts, "DEFAULT "+defVal)
+		}
 	}
 	return strings.Join(parts, " ")
 }

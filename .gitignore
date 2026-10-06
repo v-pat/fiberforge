@@ -1,3 +1,13 @@
+# Compiled binaries
+/fiberforge
+/fiberforge.exe
+npm/fiberforge/bin/fiberforge
+npm/fiberforge/bin/fiberforge.exe
+npm/fiberforge/bin/*.tar.gz
+npm/fiberforge/bin/*.zip
+npm/fiberforge/bin/temp_*
+dist/
+
 /generated
 /__debug_bin.exe
 .ai_notes/*

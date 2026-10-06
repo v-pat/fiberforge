@@ -15,6 +15,8 @@ func TestScaffoldCmd(t *testing.T) {
 	}
 	defer os.RemoveAll(tempDir)
 
+	t.Setenv("FIBERFORGE_WORKSPACE_ROOT", tempDir)
+
 	// Test case 1: Invalid template name
 	rootCmd.SetArgs([]string{"scaffold", "--template", "doesnotexist"})
 	var out bytes.Buffer
@@ -43,5 +45,12 @@ func TestScaffoldCmd(t *testing.T) {
 	out.Reset()
 	if err := rootCmd.Execute(); err == nil {
 		t.Errorf("Expected error when no args or flags are provided")
+	}
+
+	// Test case 4: Path traversal outside workspace root rejected
+	rootCmd.SetArgs([]string{"scaffold", "--template", "blog", "--output-dir", filepath.Join(tempDir, "../../outside_test")})
+	out.Reset()
+	if err := rootCmd.Execute(); err == nil {
+		t.Errorf("Expected error for output-dir outside workspace root, got none")
 	}
 }

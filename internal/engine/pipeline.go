@@ -17,6 +17,9 @@ import (
 // Generate produces the entire project on disk. It returns the output
 // directory on success.
 func (e *Engine) Generate() (string, error) {
+	if e.initErr != nil {
+		return "", fmt.Errorf("insecure output directory: %w", e.initErr)
+	}
 	if err := e.prepareDir(); err != nil {
 		return "", err
 	}
@@ -180,8 +183,10 @@ func (e *Engine) genServices() error {
 			tmpl = mongoServiceTemplate
 		}
 		content, err := e.render("service", tmpl, map[string]any{
-			"AppName": e.AppModule(),
-			"Name":    schema.Pascal(m.Name),
+			"AppName":        e.AppModule(),
+			"Name":           schema.Pascal(m.Name),
+			"IsOwned":        isModelOwned(m, e.cfg.Features.Auth),
+			"WritableFields": e.writableFields(m),
 		})
 		if err != nil {
 			return err
@@ -212,9 +217,11 @@ func (e *Engine) genControllers() error {
 			tmpl = mongoControllerTemplate
 		}
 		content, err := e.render("controller", tmpl, map[string]any{
-			"AppName":  e.AppModule(),
-			"Name":     schema.Pascal(m.Name),
-			"Endpoint": m.Endpoint,
+			"AppName":        e.AppModule(),
+			"Name":           schema.Pascal(m.Name),
+			"Endpoint":       m.Endpoint,
+			"IsOwned":        isModelOwned(m, e.cfg.Features.Auth),
+			"WritableFields": e.writableFields(m),
 		})
 		if err != nil {
 			return err

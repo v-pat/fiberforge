@@ -28,8 +28,8 @@ func TestList{{.Name}}s(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("expected 200, got %d", resp.StatusCode)
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("expected 200 or 401, got %d", resp.StatusCode)
 	}
 }
 
@@ -47,7 +47,7 @@ func TestCreate{{.Name}}(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if resp.StatusCode != http.StatusBadRequest && resp.StatusCode != http.StatusCreated {
+	if resp.StatusCode != http.StatusBadRequest && resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusUnauthorized {
 		t.Fatalf("unexpected status %d", resp.StatusCode)
 	}
 }

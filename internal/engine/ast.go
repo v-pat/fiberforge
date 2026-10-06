@@ -8,13 +8,20 @@ import (
 	"go/parser"
 	"go/token"
 	"os"
+	"strconv"
+	"strings"
 
 	"github.com/v-pat/fiberforge/internal/schema"
 )
 
 // RegisterRouteInAST parses an existing routes/routes.go file using Go AST and appends
 // route group registration for a new model or feature module without touching existing code.
+// Route statements are constructed programmatically via AST nodes, eliminating any code injection risk.
 func RegisterRouteInAST(routesFilePath string, model schema.Model, authEnabled bool) error {
+	if err := schema.ValidateEndpoint(model.Endpoint); err != nil {
+		return fmt.Errorf("invalid route endpoint: %w", err)
+	}
+
 	fset := token.NewFileSet()
 	node, err := parser.ParseFile(fset, routesFilePath, nil, parser.ParseComments)
 	if err != nil {
@@ -48,33 +55,8 @@ func RegisterRouteInAST(routesFilePath string, model schema.Model, authEnabled b
 		}
 	}
 
-	// Construct route group statements Go code snippet
-	snippet := fmt.Sprintf(`package dummy
-
-func dummy() {
-	%s := api.Group("/%s")
-`, varName, path)
-
-	if authEnabled && model.AuthProtected {
-		snippet += fmt.Sprintf("\t%s = %s.Use(middleware.JWT(auth.Secret()))\n", varName, varName)
-	}
-
-	snippet += fmt.Sprintf(`	%s.Post("/", controller.Create%s)
-	%s.Get("/", controller.List%ss)
-	%s.Get("/:id", controller.Get%sByID)
-	%s.Put("/:id", controller.Update%s)
-	%s.Delete("/:id", controller.Delete%sByID)
-}`, varName, modelName, varName, modelName, varName, modelName, varName, modelName, varName, modelName)
-
-	dummyFset := token.NewFileSet()
-	dummyNode, err := parser.ParseFile(dummyFset, "", snippet, 0)
-	if err != nil {
-		return fmt.Errorf("failed to parse route snippet: %w", err)
-	}
-
-	// Extract statements from dummy func
-	dummyFunc := dummyNode.Decls[0].(*ast.FuncDecl)
-	newStmts := dummyFunc.Body.List
+	// Programmatically construct AST statements for the route group
+	newStmts := buildRouteGroupAST(varName, modelName, path, authEnabled && model.AuthProtected)
 
 	// Append new statements to Routes() body
 	routesFunc.Body.List = append(routesFunc.Body.List, newStmts...)
@@ -91,4 +73,95 @@ func dummy() {
 	}
 
 	return os.WriteFile(routesFilePath, formatted, 0o644)
+}
+
+// buildRouteGroupAST constructs AST statements for a route group structurally.
+func buildRouteGroupAST(varName, modelName, path string, isProtected bool) []ast.Stmt {
+	cleanPath := "/" + strings.TrimPrefix(path, "/")
+	var stmts []ast.Stmt
+
+	// <varName> := api.Group("<cleanPath>")
+	assignGroup := &ast.AssignStmt{
+		Lhs: []ast.Expr{ast.NewIdent(varName)},
+		Tok: token.DEFINE,
+		Rhs: []ast.Expr{
+			&ast.CallExpr{
+				Fun: &ast.SelectorExpr{
+					X:   ast.NewIdent("api"),
+					Sel: ast.NewIdent("Group"),
+				},
+				Args: []ast.Expr{
+					&ast.BasicLit{
+						Kind:  token.STRING,
+						Value: strconv.Quote(cleanPath),
+					},
+				},
+			},
+		},
+	}
+	stmts = append(stmts, assignGroup)
+
+	// <varName> = <varName>.Use(middleware.JWT(auth.Secret()))
+	if isProtected {
+		assignAuth := &ast.AssignStmt{
+			Lhs: []ast.Expr{ast.NewIdent(varName)},
+			Tok: token.ASSIGN,
+			Rhs: []ast.Expr{
+				&ast.CallExpr{
+					Fun: &ast.SelectorExpr{
+						X:   ast.NewIdent(varName),
+						Sel: ast.NewIdent("Use"),
+					},
+					Args: []ast.Expr{
+						&ast.CallExpr{
+							Fun: &ast.SelectorExpr{
+								X:   ast.NewIdent("middleware"),
+								Sel: ast.NewIdent("JWT"),
+							},
+							Args: []ast.Expr{
+								&ast.CallExpr{
+									Fun: &ast.SelectorExpr{
+										X:   ast.NewIdent("auth"),
+										Sel: ast.NewIdent("Secret"),
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+		stmts = append(stmts, assignAuth)
+	}
+
+	makeMethodCall := func(method, route, handler string) *ast.ExprStmt {
+		return &ast.ExprStmt{
+			X: &ast.CallExpr{
+				Fun: &ast.SelectorExpr{
+					X:   ast.NewIdent(varName),
+					Sel: ast.NewIdent(method),
+				},
+				Args: []ast.Expr{
+					&ast.BasicLit{
+						Kind:  token.STRING,
+						Value: strconv.Quote(route),
+					},
+					&ast.SelectorExpr{
+						X:   ast.NewIdent("controller"),
+						Sel: ast.NewIdent(handler),
+					},
+				},
+			},
+		}
+	}
+
+	stmts = append(stmts,
+		makeMethodCall("Post", "/", "Create"+modelName),
+		makeMethodCall("Get", "/", "List"+modelName+"s"),
+		makeMethodCall("Get", "/:id", "Get"+modelName+"ByID"),
+		makeMethodCall("Put", "/:id", "Update"+modelName),
+		makeMethodCall("Delete", "/:id", "Delete"+modelName+"ByID"),
+	)
+
+	return stmts
 }

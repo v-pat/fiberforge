@@ -1,9 +1,7 @@
 # FiberForge ⚡
 
-> [!WARNING]
-> **DEVELOPMENT PHASE ONLY - NOT SAFE FOR PRODUCTION**
-> 
-> FiberForge is currently in early active development. **Do not use this package on any existing project or computer you care about.** While critical bugs (like destructive directory wiping) have been patched, the tool is highly experimental and may still behave unpredictably. It is meant for initial boilerplate generation in isolated sandbox environments. We are actively looking for contributors and code reviews to improve stability. Use at your own risk!
+> [!NOTE]
+> FiberForge has undergone security hardening and independent adversarial auditing. Report vulnerabilities responsibly via [SECURITY.md](SECURITY.md).
 
 **FiberForge** (`fiberforge`) is a high-performance Go CLI and MCP server that generates complete **Go Fiber (v2)** REST API backends from a declarative YAML or JSON schema.
 
@@ -52,11 +50,22 @@ FiberForge shifts code generation from token-by-token LLM streaming to **determi
 
 ## Installation
 
-### Via NPM / NPX (Recommended for quick start)
-You don't even need Go installed to use FiberForge. Just run it via `npx`:
+### Via NPX (Recommended for quick start)
+You don't need Go installed to use FiberForge. Run it directly with `npx`:
 ```bash
-npx fiberforge-cli init
+npx -y fiberforge-cli init
+npx -y fiberforge-cli scaffold schema.yaml
 ```
+
+### Via Global NPM
+Install globally via npm to get `fiberforge` and `fiberforge-cli` commands on your PATH:
+```bash
+npm install -g fiberforge-cli
+fiberforge --help
+```
+
+### Pre-Compiled Binaries (GitHub Releases)
+Download standalone archives for Linux, macOS, and Windows from [GitHub Releases](https://github.com/v-pat/fiberforge/releases/latest).
 
 ### Via Go
 ```bash
@@ -205,6 +214,8 @@ models:
 
   - name: post
     endpoint: posts
+    auth: true              # Authentication: protect routes with JWT
+    owner: true             # Authorization: scope records to the authenticated user
     fields:
       - name: title
         type: string
@@ -220,14 +231,28 @@ models:
       - type: manyToMany
         model: tag
 
+  # Shared authenticated resource (accessible by all authenticated users)
   - name: tag
     endpoint: tags
+    auth: true              # Requires JWT, but not scoped to individual owners
     fields:
       - name: name
         type: string
         required: true
         unique: true
 ```
+
+### Security: Authentication, Authorization & Ownership
+
+FiberForge maintains an explicit separation between who is calling an endpoint and what records they can access:
+
+| Concept | Schema Flag | Behavior |
+|---|---|---|
+| **Authentication** | `auth: true` | Requires a valid JWT Bearer token to invoke the model's endpoints. |
+| **Ownership** | `owner: true` or `belongsTo: user` | Scopes CRUD queries (GET, LIST, UPDATE, DELETE) to `WHERE user_id = ?` (or Mongo `userId`). Automatically injects authenticated `userId` on creation. |
+| **Shared Resource** | `auth: true` (without `owner: true`) | Accessible to all authenticated users (e.g. shared product catalogs, public tags, system settings). |
+
+*Note: Ambiguous field names like `authorId`, `creatorId`, or `accountId` do not automatically trigger ownership scoping unless `owner: true` or `belongsTo: user` is explicitly declared.*
 
 ### Supported Field Types
 
@@ -239,7 +264,7 @@ models:
 
 ### Relationships
 
-- `belongsTo`: Injects foreign key (`<Model>ID`) + association field (`<Model>`).
+- `belongsTo`: Injects foreign key (`<Model>ID`) + association field (`<Model>`). When `model: user`, also marks the model as user-owned.
 - `hasMany`: Injects association slice (`[]<Model>`).
 - `manyToMany`: Injects association slice (`[]<Model>`) + generates SQL join table migration (`<self>_<target>`).
 

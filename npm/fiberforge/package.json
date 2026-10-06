@@ -8,6 +8,7 @@
     "fiberforge": "run.js"
   },
   "scripts": {
+    "test": "node --test install.test.js",
     "postinstall": "node install.js"
   },
   "repository": {

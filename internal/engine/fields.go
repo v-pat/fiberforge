@@ -1,6 +1,8 @@
 package engine
 
 import (
+	"strings"
+
 	"github.com/v-pat/fiberforge/internal/schema"
 )
 
@@ -16,12 +18,14 @@ type fieldModel struct {
 
 // modelModel is the per-model data passed to model templates.
 type modelModel struct {
-	Name          string // Pascal model name
-	Fields        []fieldModel
-	HasUUID       bool
-	HasTableName  bool   // tableName/collection declared in schema
-	TableName     string // explicit table/collection name override
-	HasFK         bool   // any belongsTo relationship (mongo needs primitive.ObjectID)
+	Name           string // Pascal model name
+	Fields         []fieldModel
+	WritableFields []fieldModel
+	HasUUID        bool
+	HasTableName    bool   // tableName/collection declared in schema
+	TableName       string // explicit table/collection name override
+	QuotedTableName string // safely quoted string literal for Go source
+	HasFK           bool   // any belongsTo relationship (mongo needs primitive.ObjectID)
 	Relationships []relationshipModel
 }
 
@@ -98,4 +102,25 @@ func joinTags(tags []string) string {
 		out += t
 	}
 	return out
+}
+
+// isModelOwned checks if a model belongs to a user (owner).
+func isModelOwned(m schema.Model, authEnabled bool) bool {
+	if !authEnabled || strings.EqualFold(m.Name, "user") {
+		return false
+	}
+	if m.Owner {
+		return true
+	}
+	for _, r := range m.Relationships {
+		if r.Type == schema.BelongsTo && strings.EqualFold(r.Model, "user") {
+			return true
+		}
+	}
+	for _, f := range m.Fields {
+		if strings.EqualFold(f.Name, "userid") || strings.EqualFold(f.Name, "user_id") {
+			return true
+		}
+	}
+	return false
 }
