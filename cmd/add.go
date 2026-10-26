@@ -97,6 +97,36 @@ var addModuleCmd = &cobra.Command{
 	},
 }
 
+var addBlueprintCmd = &cobra.Command{
+	Use:     "blueprint <blueprint-id>",
+	Aliases: []string{"recipe"},
+	Short:   "Cast a blueprint into an existing project (e.g. stripe-billing, rbac, s3-storage)",
+	Args:    cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		blueprintID := args[0]
+		targetDir := addModelTargetDir
+		if targetDir == "" {
+			targetDir = "."
+		}
+
+		added, files, err := modules.ApplyWithOptions(targetDir, blueprintID, addDryRun)
+		if err != nil {
+			return fmt.Errorf("add blueprint failed: %w", err)
+		}
+
+		if addDryRun {
+			fmt.Printf("Dry-run preview for applying blueprint %q to %s:\nModels: %s\nFiles to generate:\n", blueprintID, targetDir, strings.Join(added, ", "))
+			for _, f := range files {
+				fmt.Printf("  - %s\n", f)
+			}
+			return nil
+		}
+
+		fmt.Fprintf(os.Stderr, "✓ blueprint %q successfully forged into %s (added models: %s)\n", blueprintID, targetDir, strings.Join(added, ", "))
+		return nil
+	},
+}
+
 func init() {
 	addModelCmd.Flags().StringVar(&addModelTargetDir, "dir", ".", "target project directory")
 	addModelCmd.Flags().StringVar(&addModelEndpoint, "endpoint", "", "custom API endpoint route (defaults to plural model name)")
@@ -105,7 +135,11 @@ func init() {
 	addModuleCmd.Flags().StringVar(&addModelTargetDir, "dir", ".", "target project directory")
 	addModuleCmd.Flags().BoolVar(&addDryRun, "dry-run", false, "preview files to be created and AST route diffs without writing")
 
+	addBlueprintCmd.Flags().StringVar(&addModelTargetDir, "dir", ".", "target project directory")
+	addBlueprintCmd.Flags().BoolVar(&addDryRun, "dry-run", false, "preview files to be created and AST route diffs without writing")
+
 	addCmd.AddCommand(addModelCmd)
 	addCmd.AddCommand(addModuleCmd)
+	addCmd.AddCommand(addBlueprintCmd)
 	rootCmd.AddCommand(addCmd)
 }

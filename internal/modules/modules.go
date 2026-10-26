@@ -2,11 +2,9 @@ package modules
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
 	"strings"
 
-	"github.com/v-pat/fiberforge/internal/engine"
+	"github.com/v-pat/fiberforge/internal/blueprint"
 	"github.com/v-pat/fiberforge/internal/schema"
 )
 
@@ -519,6 +517,58 @@ func Get(name string) (*Module, error) {
 	return m, nil
 }
 
+// Helper pkg path calculation
+var helperPkgMap = map[string]string{
+	"stripe-billing":     "pkg/stripe/stripe.go",
+	"ai-inference":       "pkg/ai/stream.go",
+	"vector-search":      "pkg/vector/vector.go",
+	"rbac":               "pkg/rbac/rbac.go",
+	"auth-oauth2":        "pkg/oauth2/oauth2.go",
+	"otp-2fa":            "pkg/otp/otp.go",
+	"api-keys":           "pkg/apikeys/apikeys.go",
+	"s3-storage":         "pkg/storage/s3.go",
+	"notifications":      "pkg/notifications/sse.go",
+	"email-templates":    "pkg/email/email.go",
+	"webhooks-engine":    "pkg/webhooks/signer.go",
+	"audit-log":          "pkg/audit/audit.go",
+	"multi-tenant":       "pkg/tenant/tenant.go",
+	"feature-flags":      "pkg/flags/flags.go",
+	"queues-asynq":       "pkg/queues/queues.go",
+	"search-meilisearch": "pkg/search/search.go",
+	"rate-limiter-redis": "pkg/ratelimit/limiter.go",
+	"caching-redis":      "pkg/cache/cache.go",
+	"cron-scheduler":     "pkg/cron/cron.go",
+	"comments-reactions": "pkg/comments/tree.go",
+	"activity-feed":      "pkg/feed/feed.go",
+	"analytics-events":   "pkg/analytics/events.go",
+}
+
+func init() {
+	for name, mod := range catalog {
+		bp := &blueprint.Blueprint{
+			ID:          mod.Name,
+			Version:     "1.0.0",
+			Title:       mod.Title,
+			Description: mod.Description,
+			Category:    mod.Category,
+			Target: blueprint.TargetSpec{
+				Language:  "go",
+				Framework: "fiber",
+			},
+			Models: mod.Models,
+		}
+		if hFile, ok := helperPkgMap[name]; ok {
+			content := getHelperContent(name)
+			bp.Files = append(bp.Files, blueprint.FileMapping{
+				Source:  hFile,
+				Target:  hFile,
+				Content: content,
+			})
+		}
+		blueprint.Register(bp)
+	}
+}
+
 // Apply appends all models in a module to an existing project target directory.
 func Apply(targetDir string, moduleName string) ([]string, error) {
 	added, _, err := ApplyWithOptions(targetDir, moduleName, false)
@@ -526,73 +576,14 @@ func Apply(targetDir string, moduleName string) ([]string, error) {
 }
 
 // ApplyWithOptions appends all models in a module with optional dry-run mode.
+// Delegates execution directly to the Blueprint engine.
 // Returns (addedModelNames, affectedFiles, error).
 func ApplyWithOptions(targetDir string, moduleName string, dryRun bool) ([]string, []string, error) {
-	safeTargetDir, err := schema.ResolveSafePath(targetDir, "")
-	if err != nil {
-		return nil, nil, fmt.Errorf("invalid target directory: %w", err)
-	}
-	targetDir = safeTargetDir
-
-	mod, err := Get(moduleName)
+	res, err := blueprint.Apply(targetDir, moduleName, dryRun, true)
 	if err != nil {
 		return nil, nil, err
 	}
-
-	var added []string
-	var allFiles []string
-	for _, model := range mod.Models {
-		files, err := engine.AddModelWithOptions(targetDir, model, dryRun)
-		if err != nil {
-			if strings.Contains(err.Error(), "already exists") {
-				continue
-			}
-			return nil, nil, fmt.Errorf("failed to apply model %s from module %s: %w", model.Name, moduleName, err)
-		}
-		added = append(added, model.Name)
-		allFiles = append(allFiles, files...)
-	}
-
-	// Helper pkg path calculation
-	helperPkgMap := map[string]string{
-		"stripe-billing":     "pkg/stripe/stripe.go",
-		"ai-inference":       "pkg/ai/stream.go",
-		"vector-search":      "pkg/vector/vector.go",
-		"rbac":               "pkg/rbac/rbac.go",
-		"auth-oauth2":        "pkg/oauth2/oauth2.go",
-		"otp-2fa":            "pkg/otp/otp.go",
-		"api-keys":           "pkg/apikeys/apikeys.go",
-		"s3-storage":         "pkg/storage/s3.go",
-		"notifications":      "pkg/notifications/sse.go",
-		"email-templates":    "pkg/email/email.go",
-		"webhooks-engine":    "pkg/webhooks/signer.go",
-		"audit-log":          "pkg/audit/audit.go",
-		"multi-tenant":       "pkg/tenant/tenant.go",
-		"feature-flags":      "pkg/flags/flags.go",
-		"queues-asynq":       "pkg/queues/queues.go",
-		"search-meilisearch": "pkg/search/search.go",
-		"rate-limiter-redis": "pkg/ratelimit/limiter.go",
-		"caching-redis":      "pkg/cache/cache.go",
-		"cron-scheduler":     "pkg/cron/cron.go",
-		"comments-reactions": "pkg/comments/tree.go",
-		"activity-feed":      "pkg/feed/feed.go",
-		"analytics-events":   "pkg/analytics/events.go",
-	}
-
-	if hFile, ok := helperPkgMap[mod.Name]; ok {
-		allFiles = append(allFiles, hFile)
-		if !dryRun {
-			pkgDir := filepath.Dir(filepath.Join(targetDir, hFile))
-			_ = os.MkdirAll(pkgDir, 0o755)
-			// Find matching template constant
-			content := getHelperContent(mod.Name)
-			if content != "" {
-				_ = os.WriteFile(filepath.Join(targetDir, hFile), []byte(content), 0o644)
-			}
-		}
-	}
-
-	return added, allFiles, nil
+	return res.AddedModels, res.GeneratedFiles, nil
 }
 
 func getHelperContent(modName string) string {

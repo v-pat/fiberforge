@@ -11,12 +11,14 @@ Instead of writing Go boilerplate files line-by-line (which is slow, token-heavy
 
 ## Workflow
 
-1. **Design the Schema**: Synthesize the user's domain requirements into a `fiberforge.yaml` file (or call the MCP `generate_project` tool).
+1. **Design or Introspect**:
+   - Greenfield: Synthesize the domain requirements into a `fiberforge.yaml` file (or call MCP `generate_project`).
+   - Brownfield: Reverse-engineer from an existing DB or SQL dump using `introspect_database` (or CLI `npx fiberforge-cli introspect --dsn <url>`).
 2. **Execute Scaffolding**:
    - Via CLI: `npx -y fiberforge-cli scaffold fiberforge.yaml`
    - Via MCP: Call `generate_project` with the YAML string.
-3. **Verify & Tidy**:
-   - `cd <appName> && go mod tidy && go test ./...`
+3. **Closed-Loop Verification**:
+   - Call MCP tool `verify_project` (or run `npx fiberforge-cli verify`) to confirm tidy, vet, build, and tests all pass with 0 errors.
 
 ---
 
@@ -62,6 +64,8 @@ models:
 
   - name: post
     endpoint: posts
+    auth: true              # Authentication: Protected by JWT middleware
+    owner: true             # Authorization: Scope CRUD operations to the authenticated user (WHERE user_id = ?)
     fields:
       - name: title
         type: string
@@ -74,7 +78,22 @@ models:
     relationships:
       - type: belongsTo
         model: user
+
+  # Shared authenticated resource (accessible by all authenticated users)
+  - name: category
+    endpoint: categories
+    auth: true              # Protected by JWT, but not scoped to individual owners
+    fields:
+      - name: name
+        type: string
+        required: true
 ```
+
+## Security Concepts: Authentication vs. Ownership & DTOs
+- **Authentication (`auth: true`)**: Verifies identity. Routes require a valid JWT bearer token.
+- **Ownership & Authorization (`owner: true` or `belongsTo: user`)**: Binds records to `user_id`. CRUD operations (GET, LIST, UPDATE, DELETE) are automatically scoped to `WHERE user_id = ?`. Always mark user-owned entities with `owner: true` to prevent Broken Object-Level Authorization (BOLA/IDOR).
+- **Request DTOs**: FiberForge automatically scaffolds separate `Create<Model>Request` and `Update<Model>Request` structs for controller endpoints, preventing mass-assignment vulnerabilities.
+- **Sensitive Fields**: Mark credentials with `sensitive: true` (excludes them from JSON responses via `json:"-"`).
 
 ## Supported Types & Options
 - **Field Types**: `string`, `text`, `int`, `int64`, `float`, `bool`, `time`, `uuid`, `json`, `enum` (requires `values`), `password` (bcrypt).
@@ -83,7 +102,7 @@ models:
 
 ## Best Practices for AI Agents
 - Always set `auth: true` under `features` if the user mentions login, registration, or JWT authentication.
-- Set `auth: true` on specific `models` if their endpoints require JWT protection.
+- Set `auth: true` and `owner: true` on user-owned `models` to enforce tenant isolation.
 - Mark sensitive credentials (like passwords or tokens) with `sensitive: true`.
-- Run `go mod tidy` immediately after scaffolding.
+- **Closed-Loop Verification**: Run `go mod tidy && go test -race ./...` immediately after scaffolding to ensure clean dependency resolution and 100% test passing.
 

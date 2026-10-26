@@ -20,7 +20,12 @@ Use FiberForge whenever the user asks for:
 
 - **New Project**: Call `generate_project` tool with a YAML schema string.
 - **Incremental Model Addition**: Call `add_model` to append a new entity without wiping code.
-- **Apply Feature Recipes**: Call `list_modules` and `apply_module` (`stripe-billing`, `ai-inference`, `rbac`, `s3-storage`, `audit-log`).
+- **Discover & Apply Architectural Blueprints**:
+  - `search_blueprints` (e.g. `query: "stripe"` or `"email"`)
+  - `inspect_blueprint` (e.g. `blueprintId: "stripe-billing"`)
+  - `apply_blueprint` (e.g. `blueprint: "stripe-billing"`, `dryRun: true/false`)
+- **Closed-Loop Project Verification**: Call `verify_project` to compile, vet, tidy, and test the project with structured error diagnostics.
+- **Brownfield Database Reverse-Engineering**: Call `introspect_database` with `dsn` or `sql` DDL text to reverse-engineer schemas or scaffold directly from existing databases.
 
 ### Via CLI
 
@@ -31,17 +36,28 @@ npx -y fiberforge-cli scaffold <schema.yaml>
 # Incremental model addition
 npx -y fiberforge-cli add model <ModelName>
 
-# Inject pre-packaged feature module
-npx -y fiberforge-cli add module <stripe-billing|ai-inference|rbac|s3-storage|audit-log>
+# Search, inspect, and forge architectural blueprints
+npx -y fiberforge-cli blueprint list
+npx -y fiberforge-cli blueprint search email
+npx -y fiberforge-cli blueprint inspect stripe-billing
+npx -y fiberforge-cli blueprint apply stripe-billing
+# (aliases: fiberforge add blueprint <name> or fiberforge recipe apply <name>)
+
+# Closed-loop project verification (tidy, vet, build, test)
+npx -y fiberforge-cli verify [dir]
+
+# Reverse-engineer schema or project from existing database or SQL DDL
+npx -y fiberforge-cli introspect --dsn "postgres://user:pass@localhost:5432/mydb?sslmode=disable"
+npx -y fiberforge-cli introspect --sql schema.sql --app-name myapi --scaffold
 ```
 
 ### Workflow
 
 ```
-1. Design the YAML schema
+1. Design the YAML schema (or introspect: fiberforge introspect --dsn <url>)
 2. Scaffold:  npx -y fiberforge-cli scaffold schema.yaml
-3. Expand:    npx -y fiberforge-cli add module stripe-billing
-4. Build:     cd <appName> && go mod tidy && go test ./...
+3. Cast:      npx -y fiberforge-cli blueprint apply stripe-billing
+4. Verify:    npx -y fiberforge-cli verify (or MCP tool: verify_project)
 ```
 
 ## Quick schema reference

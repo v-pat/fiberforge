@@ -12,3 +12,5 @@ dist/
 /__debug_bin.exe
 .ai_notes/*
 .serena/*
+.sf/
+.DS_Store

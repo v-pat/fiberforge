@@ -3,6 +3,7 @@ package mcp_test
 import (
 	"bytes"
 	"encoding/json"
+	"os"
 	"strings"
 	"testing"
 
@@ -132,3 +133,234 @@ func TestMCPExplainProject(t *testing.T) {
 		t.Errorf("expected generated files list, got empty")
 	}
 }
+
+func TestMCPVerifyProject(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("FIBERFORGE_WORKSPACE_ROOT", tmpDir)
+
+	goMod := "module example.com/mcpverify\n\ngo 1.23\n"
+	if err := os.WriteFile(tmpDir+"/go.mod", []byte(goMod), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	mainGo := `package main
+
+func main() {}
+`
+	if err := os.WriteFile(tmpDir+"/main.go", []byte(mainGo), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	reqData, _ := json.Marshal(map[string]any{
+		"jsonrpc": "2.0",
+		"id":      1,
+		"method":  "tools/call",
+		"params": map[string]any{
+			"name": "verify_project",
+			"arguments": map[string]any{
+				"targetDir": tmpDir,
+				"skipTests": true,
+			},
+		},
+	})
+
+	in := strings.NewReader(string(reqData) + "\n")
+	var out bytes.Buffer
+	srv := mcp.NewServer(in, &out, "test")
+
+	if err := srv.Serve(); err != nil {
+		t.Fatalf("Serve failed: %v", err)
+	}
+
+	var resp struct {
+		Result struct {
+			Success bool `json:"success"`
+		} `json:"result"`
+	}
+	if err := json.Unmarshal(out.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal response: %v", err)
+	}
+
+	if !resp.Result.Success {
+		t.Errorf("expected verify_project to succeed, got %v", out.String())
+	}
+}
+
+func TestMCPIntrospectDatabase(t *testing.T) {
+	sqlDDL := `
+CREATE TABLE products (
+	id BIGSERIAL PRIMARY KEY,
+	name VARCHAR(255) NOT NULL,
+	price NUMERIC(10, 2) NOT NULL,
+	active BOOLEAN DEFAULT true
+);
+`
+	reqData, _ := json.Marshal(map[string]any{
+		"jsonrpc": "2.0",
+		"id":      1,
+		"method":  "tools/call",
+		"params": map[string]any{
+			"name": "introspect_database",
+			"arguments": map[string]any{
+				"sql":     sqlDDL,
+				"appName": "store-api",
+				"driver":  "postgres",
+			},
+		},
+	})
+
+	in := strings.NewReader(string(reqData) + "\n")
+	var out bytes.Buffer
+	srv := mcp.NewServer(in, &out, "test")
+
+	if err := srv.Serve(); err != nil {
+		t.Fatalf("Serve failed: %v", err)
+	}
+
+	var resp struct {
+		Result struct {
+			AppName    string `json:"appName"`
+			ModelCount int    `json:"modelCount"`
+			Schema     string `json:"schema"`
+		} `json:"result"`
+	}
+	if err := json.Unmarshal(out.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal response: %v", err)
+	}
+
+	if resp.Result.AppName != "store-api" {
+		t.Errorf("expected appName 'store-api', got %q", resp.Result.AppName)
+	}
+	if resp.Result.ModelCount != 1 {
+		t.Errorf("expected 1 model, got %d", resp.Result.ModelCount)
+	}
+	if !strings.Contains(resp.Result.Schema, "name: Product") {
+		t.Errorf("expected schema to contain 'name: Product', got:\n%s", resp.Result.Schema)
+	}
+}
+
+func TestMCPSearchBlueprints(t *testing.T) {
+	reqData, _ := json.Marshal(map[string]any{
+		"jsonrpc": "2.0",
+		"id":      1,
+		"method":  "tools/call",
+		"params": map[string]any{
+			"name": "search_blueprints",
+			"arguments": map[string]any{
+				"query": "stripe",
+			},
+		},
+	})
+
+	in := strings.NewReader(string(reqData) + "\n")
+	var out bytes.Buffer
+	srv := mcp.NewServer(in, &out, "test")
+
+	if err := srv.Serve(); err != nil {
+		t.Fatalf("Serve failed: %v", err)
+	}
+
+	var resp struct {
+		Result struct {
+			Count      int `json:"count"`
+			Blueprints []struct {
+				ID string `json:"id"`
+			} `json:"blueprints"`
+		} `json:"result"`
+	}
+	if err := json.Unmarshal(out.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal response: %v", err)
+	}
+
+	if resp.Result.Count == 0 || len(resp.Result.Blueprints) == 0 {
+		t.Fatalf("expected at least 1 blueprint matching 'stripe'")
+	}
+	if resp.Result.Blueprints[0].ID != "stripe-billing" {
+		t.Errorf("expected stripe-billing, got %s", resp.Result.Blueprints[0].ID)
+	}
+}
+
+func TestMCPInspectBlueprint(t *testing.T) {
+	reqData, _ := json.Marshal(map[string]any{
+		"jsonrpc": "2.0",
+		"id":      1,
+		"method":  "tools/call",
+		"params": map[string]any{
+			"name": "inspect_blueprint",
+			"arguments": map[string]any{
+				"blueprintId": "stripe-billing",
+			},
+		},
+	})
+
+	in := strings.NewReader(string(reqData) + "\n")
+	var out bytes.Buffer
+	srv := mcp.NewServer(in, &out, "test")
+
+	if err := srv.Serve(); err != nil {
+		t.Fatalf("Serve failed: %v", err)
+	}
+
+	var resp struct {
+		Result struct {
+			Blueprint struct {
+				ID       string `json:"id"`
+				Title    string `json:"title"`
+				Category string `json:"category"`
+			} `json:"blueprint"`
+		} `json:"result"`
+	}
+	if err := json.Unmarshal(out.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal response: %v", err)
+	}
+
+	if resp.Result.Blueprint.ID != "stripe-billing" {
+		t.Errorf("expected stripe-billing, got %s", resp.Result.Blueprint.ID)
+	}
+}
+
+func TestMCPApplyBlueprintDryRun(t *testing.T) {
+	tempDir := t.TempDir()
+	t.Setenv("FIBERFORGE_WORKSPACE_ROOT", tempDir)
+	_ = os.WriteFile(tempDir+"/fiberforge.yaml", []byte("appName: testapi\ndatabase: postgres\n"), 0644)
+	reqData, _ := json.Marshal(map[string]any{
+		"jsonrpc": "2.0",
+		"id":      1,
+		"method":  "tools/call",
+		"params": map[string]any{
+			"name": "apply_blueprint",
+			"arguments": map[string]any{
+				"blueprint": "stripe-billing",
+				"targetDir": tempDir,
+				"dryRun":    true,
+			},
+		},
+	})
+
+	in := strings.NewReader(string(reqData) + "\n")
+	var out bytes.Buffer
+	srv := mcp.NewServer(in, &out, "test")
+
+	if err := srv.Serve(); err != nil {
+		t.Fatalf("Serve failed: %v", err)
+	}
+
+	var resp struct {
+		Result struct {
+			Blueprint   string   `json:"blueprint"`
+			AddedModels []string `json:"addedModels"`
+			DryRun      bool     `json:"dryRun"`
+		} `json:"result"`
+	}
+	if err := json.Unmarshal(out.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal response: %v", err)
+	}
+
+	if resp.Result.Blueprint != "stripe-billing" {
+		t.Errorf("expected stripe-billing, got %s", resp.Result.Blueprint)
+	}
+	if len(resp.Result.AddedModels) == 0 {
+		t.Errorf("expected added models in dry-run result")
+	}
+}
+

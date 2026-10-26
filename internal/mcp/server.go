@@ -3,6 +3,7 @@ package mcp
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -13,9 +14,12 @@ import (
 
 	"github.com/v-pat/fiberforge/examples"
 
+	"github.com/v-pat/fiberforge/internal/blueprint"
 	"github.com/v-pat/fiberforge/internal/engine"
+	"github.com/v-pat/fiberforge/internal/introspect"
 	"github.com/v-pat/fiberforge/internal/modules"
 	"github.com/v-pat/fiberforge/internal/schema"
+	"github.com/v-pat/fiberforge/internal/verifier"
 )
 
 // DefaultMaxMessageSize defines the maximum size of a single JSON-RPC message in bytes (4MB).
@@ -196,10 +200,20 @@ func (s *Server) callTool(params json.RawMessage) (any, *rpcError) {
 		return s.explainProject(p.Arguments)
 	case "add_model":
 		return s.addModel(p.Arguments)
+	case "search_blueprints", "search_recipes":
+		return s.searchBlueprints(p.Arguments)
+	case "inspect_blueprint", "inspect_recipe":
+		return s.inspectBlueprint(p.Arguments)
+	case "apply_blueprint", "apply_recipe":
+		return s.applyBlueprint(p.Arguments)
 	case "list_modules":
 		return s.listModules()
 	case "apply_module":
 		return s.applyModule(p.Arguments)
+	case "verify_project":
+		return s.verifyProject(p.Arguments)
+	case "introspect_database":
+		return s.introspectDatabase(p.Arguments)
 	default:
 		return nil, &rpcError{Code: -32601, Message: "unknown tool: " + p.Name}
 	}
@@ -628,6 +642,408 @@ func (s *Server) applyModule(args json.RawMessage) (any, *rpcError) {
 		"targetDir":   targetDir,
 		"dryRun":      input.DryRun,
 		"files":       files,
+	}, nil
+}
+
+func (s *Server) searchBlueprints(args json.RawMessage) (any, *rpcError) {
+	var input struct {
+		Query    string `json:"query"`
+		Category string `json:"category"`
+		Tag      string `json:"tag"`
+	}
+	if len(args) > 0 && string(args) != "{}" {
+		_ = json.Unmarshal(args, &input)
+	}
+
+	summaries := blueprint.Search(input.Query, input.Category, input.Tag)
+	sb := strings.Builder{}
+	sb.WriteString(fmt.Sprintf("Found %d Blueprint(s):\n", len(summaries)))
+	for _, b := range summaries {
+		reqEnv := ""
+		if len(b.RequiredEnv) > 0 {
+			reqEnv = fmt.Sprintf(" (Required Env: %s)", strings.Join(b.RequiredEnv, ", "))
+		}
+		sb.WriteString(fmt.Sprintf("- %s [%s]: %s (%d models)%s\n", b.ID, b.Category, b.Title, b.ModelCount, reqEnv))
+	}
+
+	return map[string]any{
+		"content": []any{
+			map[string]any{
+				"type": "text",
+				"text": sb.String(),
+			},
+		},
+		"count":      len(summaries),
+		"blueprints": summaries,
+	}, nil
+}
+
+func (s *Server) inspectBlueprint(args json.RawMessage) (any, *rpcError) {
+	var input struct {
+		BlueprintID string `json:"blueprintId"`
+		RecipeID    string `json:"recipeId"` // alias
+	}
+	if err := json.Unmarshal(args, &input); err != nil {
+		return nil, &rpcError{Code: -32602, Message: "invalid arguments: " + err.Error()}
+	}
+	id := input.BlueprintID
+	if id == "" {
+		id = input.RecipeID
+	}
+	if id == "" {
+		return nil, &rpcError{Code: -32602, Message: "argument 'blueprintId' is required"}
+	}
+
+	bp, err := blueprint.Get(id)
+	if err != nil {
+		return map[string]any{
+			"content": []any{
+				map[string]any{
+					"type": "text",
+					"text": fmt.Sprintf("Blueprint %q not found: %v", id, err),
+				},
+			},
+			"isError": true,
+		}, nil
+	}
+
+	sb := strings.Builder{}
+	sb.WriteString(fmt.Sprintf("Blueprint: %s (%s)\n", bp.Title, bp.ID))
+	sb.WriteString(fmt.Sprintf("Category:  %s\n", bp.Category))
+	sb.WriteString(fmt.Sprintf("Version:   %s\n", bp.Version))
+	sb.WriteString(fmt.Sprintf("Summary:   %s\n\n", bp.Description))
+
+	if len(bp.Env) > 0 {
+		sb.WriteString("Required Environment Variables:\n")
+		for _, e := range bp.Env {
+			req := "optional"
+			if e.Required {
+				req = "required"
+			}
+			sb.WriteString(fmt.Sprintf("  - %s (%s): %s\n", e.Key, req, e.Description))
+		}
+		sb.WriteString("\n")
+	}
+
+	if len(bp.Models) > 0 {
+		sb.WriteString(fmt.Sprintf("Database Models (%d):\n", len(bp.Models)))
+		for _, m := range bp.Models {
+			sb.WriteString(fmt.Sprintf("  - %s (endpoint: /%s, fields: %d)\n", m.Name, m.Endpoint, len(m.Fields)))
+		}
+		sb.WriteString("\n")
+	}
+
+	if len(bp.Files) > 0 {
+		sb.WriteString("Injected Files:\n")
+		for _, f := range bp.Files {
+			sb.WriteString(fmt.Sprintf("  - %s\n", f.Target))
+		}
+		sb.WriteString("\n")
+	}
+
+	if bp.AgentPrompt != "" {
+		sb.WriteString(fmt.Sprintf("Usage Guide:\n%s\n", strings.TrimSpace(bp.AgentPrompt)))
+	}
+
+	return map[string]any{
+		"content": []any{
+			map[string]any{
+				"type": "text",
+				"text": sb.String(),
+			},
+		},
+		"blueprint": bp,
+	}, nil
+}
+
+func (s *Server) applyBlueprint(args json.RawMessage) (any, *rpcError) {
+	var input struct {
+		TargetDir  string `json:"targetDir"`
+		Blueprint  string `json:"blueprint"`
+		Recipe     string `json:"recipe"` // alias
+		DryRun     bool   `json:"dryRun"`
+		SkipVerify bool   `json:"skipVerify"`
+	}
+	if err := json.Unmarshal(args, &input); err != nil {
+		return nil, &rpcError{Code: -32602, Message: "invalid arguments: " + err.Error()}
+	}
+	bpID := input.Blueprint
+	if bpID == "" {
+		bpID = input.Recipe
+	}
+	if bpID == "" {
+		return nil, &rpcError{Code: -32602, Message: "argument 'blueprint' is required"}
+	}
+
+	targetDir := input.TargetDir
+	if targetDir == "" {
+		targetDir = "."
+	}
+	root := os.Getenv("FIBERFORGE_WORKSPACE_ROOT")
+	if root == "" {
+		root, _ = os.Getwd()
+	}
+	safeDir, err := schema.ResolveSafePath(targetDir, root)
+	if err != nil {
+		return map[string]any{
+			"content": []any{
+				map[string]any{
+					"type": "text",
+					"text": fmt.Sprintf("targetDir %q is invalid or outside workspace: %v", targetDir, err),
+				},
+			},
+			"isError": true,
+		}, nil
+	}
+	targetDir = safeDir
+
+	res, err := blueprint.Apply(targetDir, bpID, input.DryRun, input.SkipVerify)
+	if err != nil {
+		return map[string]any{
+			"content": []any{
+				map[string]any{
+					"type": "text",
+					"text": fmt.Sprintf("Failed to apply blueprint %q: %v", bpID, err),
+				},
+			},
+			"isError": true,
+		}, nil
+	}
+
+	var sb strings.Builder
+	if input.DryRun {
+		sb.WriteString(fmt.Sprintf("Dry-run preview for blueprint %q in %s:\n", bpID, targetDir))
+		if len(res.AddedModels) > 0 {
+			sb.WriteString(fmt.Sprintf("Models to be generated: %s\n", strings.Join(res.AddedModels, ", ")))
+		}
+		sb.WriteString("Files to be generated:\n")
+		for _, f := range res.GeneratedFiles {
+			sb.WriteString(fmt.Sprintf("  - %s\n", f))
+		}
+	} else {
+		sb.WriteString(fmt.Sprintf("✓ Blueprint %q successfully forged into %s.\n", bpID, targetDir))
+		if len(res.AddedModels) > 0 {
+			sb.WriteString(fmt.Sprintf("Added models: %s\n", strings.Join(res.AddedModels, ", ")))
+		}
+		if res.AgentPrompt != "" {
+			sb.WriteString(fmt.Sprintf("\nNext Steps & Usage:\n%s\n", res.AgentPrompt))
+		}
+		if res.Verification != nil {
+			if res.Verification.Success {
+				sb.WriteString("\nVerification: ✓ go mod tidy & build checks passed.\n")
+			} else {
+				sb.WriteString(fmt.Sprintf("\nVerification Warning: %s\n", res.Verification.Summary))
+			}
+		}
+	}
+
+	return map[string]any{
+		"content": []any{
+			map[string]any{
+				"type": "text",
+				"text": sb.String(),
+			},
+		},
+		"blueprint":      bpID,
+		"addedModels":    res.AddedModels,
+		"targetDir":      targetDir,
+		"dryRun":         input.DryRun,
+		"generatedFiles": res.GeneratedFiles,
+		"injectedRoutes": res.InjectedRoutes,
+		"agentPrompt":    res.AgentPrompt,
+	}, nil
+}
+
+func (s *Server) verifyProject(args json.RawMessage) (any, *rpcError) {
+	var input struct {
+		TargetDir string `json:"targetDir"`
+		SkipTests bool   `json:"skipTests"`
+		NoRace    bool   `json:"noRace"`
+	}
+	if len(args) > 0 && string(args) != "{}" {
+		if err := json.Unmarshal(args, &input); err != nil {
+			return nil, &rpcError{Code: -32602, Message: "invalid arguments: " + err.Error()}
+		}
+	}
+
+	targetDir := input.TargetDir
+	if targetDir == "" {
+		targetDir = "."
+	}
+	root := os.Getenv("FIBERFORGE_WORKSPACE_ROOT")
+	if root == "" {
+		root, _ = os.Getwd()
+	}
+	safeDir, err := schema.ResolveSafePath(targetDir, root)
+	if err != nil {
+		return map[string]any{
+			"content": []any{
+				map[string]any{
+					"type": "text",
+					"text": fmt.Sprintf("targetDir %q is invalid or outside workspace: %v", targetDir, err),
+				},
+			},
+			"isError": true,
+		}, nil
+	}
+
+	res, err := verifier.Verify(context.Background(), safeDir, verifier.Options{
+		SkipTests: input.SkipTests,
+		Race:      !input.NoRace,
+		RunTidy:   true,
+	})
+	if err != nil {
+		return map[string]any{
+			"content": []any{
+				map[string]any{
+					"type": "text",
+					"text": "Verification failed to run: " + err.Error(),
+				},
+			},
+			"isError": true,
+		}, nil
+	}
+
+	return map[string]any{
+		"content": []any{
+			map[string]any{
+				"type": "text",
+				"text": res.FormatMarkdown(),
+			},
+		},
+		"success":     res.Success,
+		"summary":     res.Summary,
+		"steps":       res.Steps,
+		"testsPassed": res.TestsPassed,
+		"testsFailed": res.TestsFailed,
+		"isError":     !res.Success,
+	}, nil
+}
+
+func (s *Server) introspectDatabase(args json.RawMessage) (any, *rpcError) {
+	var input struct {
+		DSN       string `json:"dsn"`
+		SQL       string `json:"sql"`
+		Driver    string `json:"driver"`
+		AppName   string `json:"appName"`
+		Scaffold  bool   `json:"scaffold"`
+		OutputDir string `json:"outputDir"`
+	}
+	if len(args) > 0 && string(args) != "{}" {
+		if err := json.Unmarshal(args, &input); err != nil {
+			return nil, &rpcError{Code: -32602, Message: "invalid arguments: " + err.Error()}
+		}
+	}
+	if input.DSN == "" && input.SQL == "" {
+		return nil, &rpcError{Code: -32602, Message: "must provide either 'dsn' or 'sql' parameter"}
+	}
+
+	appName := input.AppName
+	if appName == "" {
+		appName = "introspected-api"
+	}
+	driver := input.Driver
+	if driver == "" {
+		driver = "postgres"
+	}
+
+	var cfg *schema.Config
+	var err error
+	if input.SQL != "" {
+		cfg, err = introspect.IntrospectSQL(input.SQL, appName, driver)
+		if err != nil {
+			return map[string]any{
+				"content": []any{
+					map[string]any{
+						"type": "text",
+						"text": "SQL DDL introspection failed: " + err.Error(),
+					},
+				},
+				"isError": true,
+			}, nil
+		}
+	} else {
+		cfg, err = introspect.IntrospectDatabase(context.Background(), introspect.Options{
+			AppName:  appName,
+			Database: driver,
+			DSN:      input.DSN,
+		})
+		if err != nil {
+			return map[string]any{
+				"content": []any{
+					map[string]any{
+						"type": "text",
+						"text": "Database introspection failed: " + err.Error(),
+					},
+				},
+				"isError": true,
+			}, nil
+		}
+	}
+
+	yamlStr, err := introspect.ToYAML(cfg)
+	if err != nil {
+		return nil, &rpcError{Code: -32603, Message: "failed to format YAML: " + err.Error()}
+	}
+
+	if input.Scaffold {
+		targetDir := input.OutputDir
+		if targetDir == "" {
+			targetDir = "./" + cfg.AppName
+		}
+		root := os.Getenv("FIBERFORGE_WORKSPACE_ROOT")
+		if root == "" {
+			root, _ = os.Getwd()
+		}
+		safeDir, err := schema.ResolveSafePath(targetDir, root)
+		if err != nil {
+			return map[string]any{
+				"content": []any{
+					map[string]any{
+						"type": "text",
+						"text": fmt.Sprintf("targetDir %q is invalid or outside workspace: %v", targetDir, err),
+					},
+				},
+				"isError": true,
+			}, nil
+		}
+		cfg.OutputDir = safeDir
+		cfg.WorkspaceRoot = root
+
+		eng := engine.New(cfg)
+		outDir, err := eng.Generate()
+		if err != nil {
+			return map[string]any{
+				"content": []any{
+					map[string]any{
+						"type": "text",
+						"text": "Scaffolding failed: " + err.Error(),
+					},
+				},
+				"isError": true,
+			}, nil
+		}
+		cfg.OutputDir = outDir
+	}
+
+	summary := fmt.Sprintf("Successfully introspected %d models (%s).", len(cfg.Models), cfg.Database)
+	if input.Scaffold {
+		summary += fmt.Sprintf(" Project successfully scaffolded into %s.", cfg.OutputDir)
+	}
+
+	return map[string]any{
+		"content": []any{
+			map[string]any{
+				"type": "text",
+				"text": summary + "\n\n```yaml\n" + yamlStr + "```",
+			},
+		},
+		"schema":     yamlStr,
+		"appName":    cfg.AppName,
+		"database":   cfg.Database,
+		"modelCount": len(cfg.Models),
+		"scaffolded": input.Scaffold,
+		"outputDir":  cfg.OutputDir,
 	}, nil
 }
 

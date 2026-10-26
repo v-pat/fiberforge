@@ -32,9 +32,17 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
+// TokenPair contains access and refresh tokens.
+type TokenPair struct {
+	Token        string ` + "`json:\"token\"`" + `
+	RefreshToken string ` + "`json:\"refreshToken\"`" + `
+	ExpiresIn    int64  ` + "`json:\"expiresIn\"`" + `
+}
+
 // claims is the JWT payload shape.
 type claims struct {
-	UserID uint ` + "`json:\"sub\"`" + `
+	UserID    uint   ` + "`json:\"sub\"`" + `
+	TokenType string ` + "`json:\"type,omitempty\"`" + `
 	jwt.RegisteredClaims
 }
 
@@ -49,13 +57,46 @@ func Secret() []byte {
 
 // GenerateToken issues a signed token for the given user id.
 func GenerateToken(userID uint) (string, error) {
-	c := claims{
-		UserID: userID,
+	pair, err := GenerateTokenPair(userID)
+	if err != nil {
+		return "", err
+	}
+	return pair.Token, nil
+}
+
+// GenerateTokenPair issues both an access token (15m) and a refresh token (7d).
+func GenerateTokenPair(userID uint) (*TokenPair, error) {
+	accessExpiry := time.Now().Add(15 * time.Minute)
+	accessClaims := claims{
+		UserID:    userID,
+		TokenType: "access",
 		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
+			ExpiresAt: jwt.NewNumericDate(accessExpiry),
 		},
 	}
-	return jwt.NewWithClaims(jwt.SigningMethodHS256, c).SignedString(Secret())
+	accessToken, err := jwt.NewWithClaims(jwt.SigningMethodHS256, accessClaims).SignedString(Secret())
+	if err != nil {
+		return nil, err
+	}
+
+	refreshExpiry := time.Now().Add(7 * 24 * time.Hour)
+	refreshClaims := claims{
+		UserID:    userID,
+		TokenType: "refresh",
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(refreshExpiry),
+		},
+	}
+	refreshToken, err := jwt.NewWithClaims(jwt.SigningMethodHS256, refreshClaims).SignedString(Secret())
+	if err != nil {
+		return nil, err
+	}
+
+	return &TokenPair{
+		Token:        accessToken,
+		RefreshToken: refreshToken,
+		ExpiresIn:    900,
+	}, nil
 }
 
 // ValidateToken parses and verifies a token, returning the user id.
@@ -72,6 +113,27 @@ func ValidateToken(tokenStr string) (uint, error) {
 	}
 	if !token.Valid {
 		return 0, errors.New("invalid token")
+	}
+	return c.UserID, nil
+}
+
+// ValidateRefreshToken parses and verifies a refresh token.
+func ValidateRefreshToken(tokenStr string) (uint, error) {
+	var c claims
+	token, err := jwt.ParseWithClaims(tokenStr, &c, func(t *jwt.Token) (any, error) {
+		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, errors.New("unexpected signing method")
+		}
+		return Secret(), nil
+	})
+	if err != nil {
+		return 0, err
+	}
+	if !token.Valid {
+		return 0, errors.New("invalid token")
+	}
+	if c.TokenType != "refresh" {
+		return 0, errors.New("not a refresh token")
 	}
 	return c.UserID, nil
 }
@@ -273,12 +335,12 @@ func Register(c *fiber.Ctx) error {
 		slog.Error("failed to register user", "error", err)
 		return SendError(c, fiber.StatusConflict, "CONFLICT", "unable to register account", nil)
 	}
-	token, err := auth.GenerateToken(user.ID)
+	pair, err := auth.GenerateTokenPair(user.ID)
 	if err != nil {
 		slog.Error("failed to issue token", "error", err)
 		return SendError(c, fiber.StatusInternalServerError, "INTERNAL_ERROR", "failed to issue token", nil)
 	}
-	return SendSuccess(c, fiber.StatusCreated, fiber.Map{"token": token})
+	return SendSuccess(c, fiber.StatusCreated, pair)
 }
 
 // Login handles POST /api/auth/login.
@@ -294,12 +356,12 @@ func Login(c *fiber.Ctx) error {
 	if err != nil {
 		return SendError(c, fiber.StatusUnauthorized, "UNAUTHORIZED", "invalid credentials", nil)
 	}
-	token, err := auth.GenerateToken(user.ID)
+	pair, err := auth.GenerateTokenPair(user.ID)
 	if err != nil {
 		slog.Error("failed to issue token", "error", err)
 		return SendError(c, fiber.StatusInternalServerError, "INTERNAL_ERROR", "failed to issue token", nil)
 	}
-	return SendSuccess(c, fiber.StatusOK, fiber.Map{"token": token})
+	return SendSuccess(c, fiber.StatusOK, pair)
 }
 
 // Me handles GET /api/auth/me (protected).
@@ -315,18 +377,35 @@ func Me(c *fiber.Ctx) error {
 	return SendSuccess(c, fiber.StatusOK, m)
 }
 
-// Refresh re-issues a token for the authenticated user (protected).
+type refreshRequest struct {
+	RefreshToken string ` + "`json:\"refreshToken\"`" + `
+}
+
+// Refresh re-issues a token pair for the authenticated user or using a refresh token.
 func Refresh(c *fiber.Ctx) error {
-	id, ok := c.Locals("userId").(uint)
-	if !ok {
+	var payload refreshRequest
+	_ = c.BodyParser(&payload)
+
+	var id uint
+	var err error
+
+	if payload.RefreshToken != "" {
+		id, err = auth.ValidateRefreshToken(payload.RefreshToken)
+		if err != nil {
+			return SendError(c, fiber.StatusUnauthorized, "INVALID_REFRESH_TOKEN", "invalid or expired refresh token", nil)
+		}
+	} else if uid, ok := c.Locals("userId").(uint); ok {
+		id = uid
+	} else {
 		return SendError(c, fiber.StatusUnauthorized, "UNAUTHENTICATED", "unauthenticated", nil)
 	}
-	token, err := auth.GenerateToken(id)
+
+	pair, err := auth.GenerateTokenPair(id)
 	if err != nil {
-		slog.Error("failed to issue token", "error", err)
-		return SendError(c, fiber.StatusInternalServerError, "INTERNAL_ERROR", "failed to issue token", nil)
+		slog.Error("failed to rotate tokens", "error", err)
+		return SendError(c, fiber.StatusInternalServerError, "INTERNAL_ERROR", "failed to issue token pair", nil)
 	}
-	return SendSuccess(c, fiber.StatusOK, fiber.Map{"token": token})
+	return SendSuccess(c, fiber.StatusOK, pair)
 }
 `
 
@@ -362,12 +441,12 @@ func Register(c *fiber.Ctx) error {
 		slog.Error("failed to register user", "error", err)
 		return SendError(c, fiber.StatusConflict, "CONFLICT", "unable to register account", nil)
 	}
-	token, err := auth.GenerateToken(user.ID.Hex())
+	pair, err := auth.GenerateTokenPair(user.ID.Hex())
 	if err != nil {
 		slog.Error("failed to issue token", "error", err)
 		return SendError(c, fiber.StatusInternalServerError, "INTERNAL_ERROR", "failed to issue token", nil)
 	}
-	return SendSuccess(c, fiber.StatusCreated, fiber.Map{"token": token})
+	return SendSuccess(c, fiber.StatusCreated, pair)
 }
 
 // Login handles POST /api/auth/login.
@@ -383,12 +462,12 @@ func Login(c *fiber.Ctx) error {
 	if err != nil {
 		return SendError(c, fiber.StatusUnauthorized, "UNAUTHORIZED", "invalid credentials", nil)
 	}
-	token, err := auth.GenerateToken(user.ID.Hex())
+	pair, err := auth.GenerateTokenPair(user.ID.Hex())
 	if err != nil {
 		slog.Error("failed to issue token", "error", err)
 		return SendError(c, fiber.StatusInternalServerError, "INTERNAL_ERROR", "failed to issue token", nil)
 	}
-	return SendSuccess(c, fiber.StatusOK, fiber.Map{"token": token})
+	return SendSuccess(c, fiber.StatusOK, pair)
 }
 
 // Me handles GET /api/auth/me (protected).
@@ -404,18 +483,35 @@ func Me(c *fiber.Ctx) error {
 	return SendSuccess(c, fiber.StatusOK, m)
 }
 
-// Refresh re-issues a token for the authenticated user (protected).
+type refreshRequest struct {
+	RefreshToken string ` + "`json:\"refreshToken\"`" + `
+}
+
+// Refresh re-issues a token pair for the authenticated user or using a refresh token.
 func Refresh(c *fiber.Ctx) error {
-	id, ok := c.Locals("userId").(string)
-	if !ok {
+	var payload refreshRequest
+	_ = c.BodyParser(&payload)
+
+	var id string
+	var err error
+
+	if payload.RefreshToken != "" {
+		id, err = auth.ValidateRefreshToken(payload.RefreshToken)
+		if err != nil {
+			return SendError(c, fiber.StatusUnauthorized, "INVALID_REFRESH_TOKEN", "invalid or expired refresh token", nil)
+		}
+	} else if uid, ok := c.Locals("userId").(string); ok {
+		id = uid
+	} else {
 		return SendError(c, fiber.StatusUnauthorized, "UNAUTHENTICATED", "unauthenticated", nil)
 	}
-	token, err := auth.GenerateToken(id)
+
+	pair, err := auth.GenerateTokenPair(id)
 	if err != nil {
-		slog.Error("failed to issue token", "error", err)
-		return SendError(c, fiber.StatusInternalServerError, "INTERNAL_ERROR", "failed to issue token", nil)
+		slog.Error("failed to rotate tokens", "error", err)
+		return SendError(c, fiber.StatusInternalServerError, "INTERNAL_ERROR", "failed to issue token pair", nil)
 	}
-	return SendSuccess(c, fiber.StatusOK, fiber.Map{"token": token})
+	return SendSuccess(c, fiber.StatusOK, pair)
 }
 `
 
@@ -432,9 +528,17 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
+// TokenPair contains access and refresh tokens.
+type TokenPair struct {
+	Token        string ` + "`json:\"token\"`" + `
+	RefreshToken string ` + "`json:\"refreshToken\"`" + `
+	ExpiresIn    int64  ` + "`json:\"expiresIn\"`" + `
+}
+
 // claims is the JWT payload shape.
 type claims struct {
-	Subject string ` + "`json:\"sub\"`" + `
+	Subject   string ` + "`json:\"sub\"`" + `
+	TokenType string ` + "`json:\"type,omitempty\"`" + `
 	jwt.RegisteredClaims
 }
 
@@ -449,13 +553,46 @@ func Secret() []byte {
 
 // GenerateToken issues a signed token for the given user id.
 func GenerateToken(subject string) (string, error) {
-	c := claims{
-		Subject: subject,
+	pair, err := GenerateTokenPair(subject)
+	if err != nil {
+		return "", err
+	}
+	return pair.Token, nil
+}
+
+// GenerateTokenPair issues both an access token (15m) and a refresh token (7d).
+func GenerateTokenPair(subject string) (*TokenPair, error) {
+	accessExpiry := time.Now().Add(15 * time.Minute)
+	accessClaims := claims{
+		Subject:   subject,
+		TokenType: "access",
 		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
+			ExpiresAt: jwt.NewNumericDate(accessExpiry),
 		},
 	}
-	return jwt.NewWithClaims(jwt.SigningMethodHS256, c).SignedString(Secret())
+	accessToken, err := jwt.NewWithClaims(jwt.SigningMethodHS256, accessClaims).SignedString(Secret())
+	if err != nil {
+		return nil, err
+	}
+
+	refreshExpiry := time.Now().Add(7 * 24 * time.Hour)
+	refreshClaims := claims{
+		Subject:   subject,
+		TokenType: "refresh",
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(refreshExpiry),
+		},
+	}
+	refreshToken, err := jwt.NewWithClaims(jwt.SigningMethodHS256, refreshClaims).SignedString(Secret())
+	if err != nil {
+		return nil, err
+	}
+
+	return &TokenPair{
+		Token:        accessToken,
+		RefreshToken: refreshToken,
+		ExpiresIn:    900,
+	}, nil
 }
 
 // ValidateToken parses and verifies a token, returning the subject.
@@ -472,6 +609,27 @@ func ValidateToken(tokenStr string) (string, error) {
 	}
 	if !token.Valid {
 		return "", errors.New("invalid token")
+	}
+	return c.Subject, nil
+}
+
+// ValidateRefreshToken parses and verifies a refresh token.
+func ValidateRefreshToken(tokenStr string) (string, error) {
+	var c claims
+	token, err := jwt.ParseWithClaims(tokenStr, &c, func(t *jwt.Token) (any, error) {
+		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, errors.New("unexpected signing method")
+		}
+		return Secret(), nil
+	})
+	if err != nil {
+		return "", err
+	}
+	if !token.Valid {
+		return "", errors.New("invalid token")
+	}
+	if c.TokenType != "refresh" {
+		return 0, errors.New("not a refresh token")
 	}
 	return c.Subject, nil
 }

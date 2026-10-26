@@ -44,7 +44,7 @@ FiberForge shifts code generation from token-by-token LLM streaming to **determi
   - GitHub Actions CI workflow with `golangci-lint` and race-detector testing.
 - **Dual Mode (Single Binary)**:
   - CLI mode (`fiberforge scaffold`, `fiberforge init`, `--dry-run`).
-  - Agentic MCP server (`fiberforge serve`) exposing 5 tools over stdio JSON-RPC 2.0.
+  - Agentic MCP server (`fiberforge serve`) exposing 10 tools over stdio JSON-RPC 2.0.
 
 ---
 
@@ -108,7 +108,27 @@ Preview generated files without touching disk:
 fiberforge scaffold examples/blog.yaml --dry-run
 ```
 
-### 3. AI Agent MCP Server (`fiberforge serve`)
+### 3. Database Reverse Introspection (`fiberforge introspect`)
+
+Reverse-engineer a `fiberforge.yaml` schema or an entire Go Fiber REST API directly from an existing live PostgreSQL / MySQL database or from a raw SQL DDL file:
+
+```bash
+# Introspect from live PostgreSQL connection
+fiberforge introspect --dsn "postgres://user:pass@localhost:5432/mydb?sslmode=disable" -o schema.yaml
+
+# Introspect from SQL DDL dump file and scaffold Go backend immediately
+fiberforge introspect --sql ./schema.sql --app-name myapi --scaffold
+```
+
+### 4. Closed-Loop Project Verification (`fiberforge verify`)
+
+Verify that a generated or modified Go project is 100% healthy by running `go mod tidy`, `go vet`, `go build`, and `go test -race` with agent-friendly diagnostics:
+
+```bash
+fiberforge verify ./myapp
+```
+
+### 5. AI Agent MCP Server (`fiberforge serve`)
 
 Run FiberForge as a Model Context Protocol (MCP) server over stdio for AI coding agents (**Claude Code**, **Cursor**, **Cline**, **Windsurf**, **opencode**):
 
