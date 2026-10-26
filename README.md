@@ -108,7 +108,31 @@ Preview generated files without touching disk:
 fiberforge scaffold examples/blog.yaml --dry-run
 ```
 
-### 3. Database Reverse Introspection (`fiberforge introspect`)
+### 3. Architectural Blueprints (`fiberforge blueprint`)
+
+Blueprints are production-grade, pre-packaged architectural components that can be cast into any existing Go project without wiping out custom code:
+
+```bash
+# List all 22+ built-in blueprints (Stripe, AI streaming, S3, RBAC, Redis, etc.)
+fiberforge blueprint list
+
+# Search by keyword or tag
+fiberforge blueprint search email
+
+# Inspect specifications, database models, and required environment variables
+fiberforge blueprint inspect stripe-billing
+
+# Preview files and AST route diffs without touching disk
+fiberforge blueprint apply stripe-billing --dry-run
+
+# Cast the blueprint into your active project
+fiberforge blueprint apply stripe-billing
+
+# List all blueprints currently forged into your project
+fiberforge blueprint list --installed
+```
+
+### 4. Database Reverse Introspection (`fiberforge introspect`)
 
 Reverse-engineer a `fiberforge.yaml` schema or an entire Go Fiber REST API directly from an existing live PostgreSQL / MySQL database or from a raw SQL DDL file:
 
@@ -120,7 +144,7 @@ fiberforge introspect --dsn "postgres://user:pass@localhost:5432/mydb?sslmode=di
 fiberforge introspect --sql ./schema.sql --app-name myapi --scaffold
 ```
 
-### 4. Closed-Loop Project Verification (`fiberforge verify`)
+### 5. Closed-Loop Project Verification (`fiberforge verify`)
 
 Verify that a generated or modified Go project is 100% healthy by running `go mod tidy`, `go vet`, `go build`, and `go test -race` with agent-friendly diagnostics:
 
@@ -128,7 +152,7 @@ Verify that a generated or modified Go project is 100% healthy by running `go mo
 fiberforge verify ./myapp
 ```
 
-### 5. AI Agent MCP Server (`fiberforge serve`)
+### 6. AI Agent MCP Server (`fiberforge serve`)
 
 Run FiberForge as a Model Context Protocol (MCP) server over stdio for AI coding agents (**Claude Code**, **Cursor**, **Cline**, **Windsurf**, **opencode**):
 
@@ -186,6 +210,12 @@ When active, your AI agent will design the schema and invoke `npx fiberforge-cli
 | `get_schema_template` | Fetch a pre-built starter schema (`blog`, `ecommerce`, `saas`, `social`) to customize. |
 | `list_field_types` | List all supported field types, options, database drivers, and relationship kinds. |
 | `explain_project` | Dry-run a schema to inspect the exact file tree, models, and endpoints it produces. |
+| `add_model` | Incrementally add an entity model to an existing project without overwriting manual code. |
+| `search_blueprints` | Search available architectural feature blueprints by keyword, tag, or category. |
+| `inspect_blueprint` | Inspect a blueprint's specifications, database models, and required environment variables. |
+| `apply_blueprint` | Cast/forge an architectural feature blueprint into an existing project. |
+| `verify_project` | Run `go mod tidy`, `go vet`, `go build`, and tests with structured JSON diagnostics. |
+| `introspect_database` | Reverse-engineer schemas or projects from PostgreSQL/MySQL or raw SQL DDL. |
 
 ---
 
@@ -320,6 +350,128 @@ blog/
 ├── Dockerfile, docker-compose.yml, Makefile
 └── .github/workflows/ci.yml    # GitHub Actions workflow
 ```
+
+---
+
+## Authoring Custom Blueprints (Developer Guide) 🛠️
+
+Want to package your own reusable capability (e.g. Twilio SMS, Cloudflare R2, Kafka streaming, Algolia search) or share enterprise architectural patterns across your engineering team?
+
+FiberForge blueprints are **modular directory bundles** with compilable Go code, declarative schemas, and AST injection hooks.
+
+### 1. Blueprint Directory Layout
+
+```
+blueprints/
+└── resend-mailer/
+    ├── blueprint.yaml           # Metadata, models, env vars, dependencies, hooks
+    ├── README.md                # Human & AI Agent documentation
+    └── files/                   # Real, gofmt-formatted Go source code
+        └── pkg/
+            └── mailer/
+                ├── mailer.go
+                └── mailer_test.go
+```
+
+### 2. The Blueprint Manifest (`blueprint.yaml`)
+
+```yaml
+id: resend-mailer
+version: "1.0.0"
+title: "Resend Transactional Mailer"
+description: "Send transactional emails and verification tokens via Resend Go SDK"
+category: "Communications"
+tags: [email, mailer, resend, transactional]
+author: "your-name"
+license: "MIT"
+
+target:
+  language: go
+  framework: fiber
+  minRuntimeVersion: "1.23.0"
+
+# External Go dependencies to add
+dependencies:
+  - package: github.com/resend/resend-go/v2
+    version: v2.6.0
+
+# Environment variables automatically documented in .env.example
+env:
+  - key: RESEND_API_KEY
+    required: true
+    description: "API key from https://resend.com/api-keys"
+    example: "re_123456789"
+  - key: RESEND_FROM_EMAIL
+    required: false
+    default: "onboarding@resend.dev"
+    description: "Verified sender email"
+
+# Database models compiled by FiberForge (GORM/MGM, DTOs, migrations, tests)
+models:
+  - name: EmailLog
+    endpoint: email-logs
+    auth: true
+    owner: true
+    fields:
+      - name: toEmail
+        type: string
+        required: true
+      - name: subject
+        type: string
+        required: true
+      - name: status
+        type: enum
+        values: [queued, sent, failed]
+        default: "queued"
+
+# Files injected into the target project
+files:
+  - source: "files/pkg/mailer/mailer.go"
+    target: "pkg/mailer/mailer.go"
+  - source: "files/pkg/mailer/mailer_test.go"
+    target: "pkg/mailer/mailer_test.go"
+
+# Dynamic code hooks weaved by FiberForge's AST engine
+hooks:
+  imports:
+    - "myapp/pkg/mailer"
+  init:
+    - "mailer.Init()"
+  routes:
+    - path: "/webhooks/resend"
+      method: "POST"
+      handler: "mailer.HandleWebhook"
+      auth: false
+
+# Usage instructions returned to developers and AI coding agents
+agentPrompt: |
+  Resend mailer is installed at `pkg/mailer`.
+  Example usage in handlers:
+    m := mailer.New()
+    emailID, err := m.Send(c.Context(), toEmail, subject, htmlContent)
+```
+
+### 3. Testing Your Blueprint
+
+You can preview and apply your blueprint bundle directly from a local folder:
+
+```bash
+# Preview file generation and AST route diffs
+fiberforge blueprint apply ./path/to/resend-mailer --dry-run
+
+# Forge the local blueprint bundle into your project
+fiberforge blueprint apply ./path/to/resend-mailer --dir ./myapp
+
+# Verify compilation, linting, and tests
+fiberforge verify ./myapp
+```
+
+### 4. Contributing to the Official Registry
+
+To publish your blueprint to the official FiberForge registry (`github.com/v-pat/fiberforge-blueprints`):
+1. Fork the registry repository.
+2. Place your bundle in `blueprints/<your-blueprint-id>/`.
+3. Submit a pull request. Automated CI will validate your `blueprint.yaml`, execute `go vet` on your files, and test compilation.
 
 ---
 
